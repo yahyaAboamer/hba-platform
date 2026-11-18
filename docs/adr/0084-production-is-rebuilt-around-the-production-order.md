@@ -1,6 +1,6 @@
 # 0084. Production is rebuilt around the production order, as platform screens
 
-**Status:** Accepted; decision 1's carry-over of old records is superseded by ADR 0085 (Production starts from zero)
+**Status:** Accepted; decision 1's carry-over of old records is superseded by ADR 0085 (Production starts from zero); who holds the owner's acts is amended by ADR 0086 (the production manager too)
 **Date:** 2026-11-14
 
 ## Context

@@ -120,8 +120,8 @@ export const ROLE_BLURB: Record<string, string> = {
   content_manager: "Looks up models, records targets and sets pay terms",
   affiliate_manager: "Runs models and targets, and approves pay",
   production_viewer: "Reads Production",
-  production_staff: "Runs orders, tasks and samples, and records quality checks",
-  production_manager: "Runs Production and its suppliers",
+  production_staff: "Records quality checks, cut counts and deliveries; sees no money",
+  production_manager: "Runs all of Production, its suppliers and its money",
 };
 
 /** *Inbox staff · Affiliates manager*, from the roles when the server sent no words. */

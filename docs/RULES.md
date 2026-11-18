@@ -324,9 +324,9 @@ payroll without touching a maintainer screen.
   superseding 0069's own look; ADR 0085 removed the old app and its records). One order
   is one style in one colour at one factory, through ten stages. Pieces are
   counted per size from planned to Khazenly's count, and every drop carries a
-  reason. Only the owner (`production.owner`) creates orders, approves
-  samples, settles and sees money; **the QC manager never receives a cost,
-  rate or balance**. The factory is owed the making rate per piece cut, less
+  reason. Only the owner and the production manager (`production.owner`,
+  ADR 0086) create orders, approve samples, settle and see money; **the QC
+  manager (production staff) never receives a cost, rate or balance**. The factory is owed the making rate per piece cut, less
   rejected pieces (the making, and the fabric too when the factory bought
   it) and less pieces held until fixed. **The factory's own login** (role
   `factory`, not staff) sees only its own orders and no money, ratings or

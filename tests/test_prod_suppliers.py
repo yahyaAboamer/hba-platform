@@ -686,7 +686,7 @@ def test_payments_write_one_negative_line_and_a_wrong_one_is_reversed_never_edit
     sid = _make(owner)["id"]
     url = f"/api/prod/suppliers/{sid}/payments"
     good = {"amount_piastres": 3_000_000, "method": "instapay", "kind": "weekly", "note": "Week 46"}
-    for person in (viewer, staff, manager):
+    for person in (viewer, staff):
         assert person.post(url, json=good).status_code == 403
     for bad in (
         {**good, "amount_piastres": 0},
@@ -711,7 +711,7 @@ def test_payments_write_one_negative_line_and_a_wrong_one_is_reversed_never_edit
 
     assert _reverse(owner, line["id"], " ").status_code == 422
     assert owner.post(f"/api/prod/entries/{line['id']}/reverse", json={}).status_code == 422
-    for person in (viewer, staff, manager):
+    for person in (viewer, staff):
         assert _reverse(person, line["id"]).status_code == 403
     assert _reverse(owner, 9999).status_code == 404
     reversed_ = _reverse(owner, line["id"], "Wrong supplier")
@@ -746,7 +746,7 @@ def test_only_this_years_unreversed_payments_count_as_paid_this_year(owner):
 def test_a_balance_brought_forward_is_one_line_and_corrected_by_an_adjustment(owner, staff, manager):
     sid = _make(owner)["id"]
     url = f"/api/prod/suppliers/{sid}/opening"
-    for person in (staff, manager):
+    for person in (staff,):
         assert person.post(url, json={"amount_piastres": 100}).status_code == 403
     assert owner.post(url, json={"amount_piastres": 0}).status_code == 422
     assert owner.post(url, json={"amount_piastres": 100, "happened_on": "2999-01-01"}).status_code == 422
@@ -771,7 +771,7 @@ def test_a_balance_brought_forward_is_one_line_and_corrected_by_an_adjustment(ow
     assert owner.post(adjust, json={"amount_piastres": 250_000}).status_code == 422  # a note is required
     assert owner.post(adjust, json={"amount_piastres": 250_000, "note": "  "}).status_code == 422
     assert owner.post(adjust, json={"amount_piastres": 0, "note": "x"}).status_code == 422
-    for person in (staff, manager):
+    for person in (staff,):
         assert person.post(adjust, json={"amount_piastres": 1, "note": "x"}).status_code == 403
     more = owner.post(adjust, json={"amount_piastres": 250_000, "note": "Missed invoice"})
     less = owner.post(adjust, json={"amount_piastres": -50_000, "note": "Discount"})
@@ -1116,7 +1116,7 @@ def test_a_receipt_is_added_served_replaced_and_removed_by_the_owner_alone(owner
     entry = _pay(owner, sid)["entry_id"]
     url = f"/api/prod/entries/{entry}/receipt"
     photo = {"file": ("slip.png", PNG, "image/png")}
-    for person in (viewer, staff, manager):
+    for person in (viewer, staff):
         assert person.post(url, files=photo).status_code == 403
     saved = owner.post(url, files=photo)
     assert saved.status_code == 201, saved.text
@@ -1127,7 +1127,7 @@ def test_a_receipt_is_added_served_replaced_and_removed_by_the_owner_alone(owner
     served = owner.get(url)
     assert served.status_code == 200 and served.content == PNG
     assert served.headers["x-content-type-options"] == "nosniff" and served.headers["cache-control"] == "no-store"
-    for person in (viewer, staff, manager):  # the photo is refused to everybody but the owner
+    for person in (viewer, staff):  # the photo is refused to everybody without the money permission
         assert person.get(url).status_code == 403
         assert person.delete(url).status_code == 403
     with TestClient(app_for_stranger()) as stranger:
@@ -1172,7 +1172,7 @@ ROLES = {
 }
 
 
-@pytest.mark.parametrize("role", ["viewer", "staff", "manager"])
+@pytest.mark.parametrize("role", ["viewer", "staff"])
 def test_every_route_asks_its_permission_and_answers_nobody_else_money(owner, role, bucket):
     """Every endpoint, for each Production role short of the owner's: what its
     permission allows works and carries no money at any depth (nor the word
@@ -1617,3 +1617,18 @@ def test_a_supplier_with_a_balance_but_no_open_order_can_still_be_made_inactive(
     sid = _make(owner)["id"]
     _pay(owner, sid)
     assert manager.patch(f"/api/prod/suppliers/{sid}", json={"active": False}).status_code == 200
+
+
+def test_the_production_manager_holds_the_money_too(owner, manager, bucket):
+    """ADR 0086: the production manager holds everything in Production,
+    money included - payments, a balance brought forward, receipts, and
+    every amount on the supplier list."""
+    sid = _make(owner)["id"]
+    paid = manager.post(f"/api/prod/suppliers/{sid}/payments", json={"amount_piastres": 50_000, "method": "cash", "kind": "weekly"})
+    assert paid.status_code == 201, paid.text
+    assert manager.post(f"/api/prod/suppliers/{sid}/opening", json={"amount_piastres": 100}).status_code == 201
+    receipt = manager.post(f"/api/prod/entries/{paid.json()['entry_id']}/receipt", files={"file": ("a.png", PNG, "image/png")})
+    assert receipt.status_code == 201, receipt.text
+    listed = manager.get("/api/prod/suppliers").json()
+    assert "owed_total_piastres" in listed
+    assert all("owed_piastres" in row for row in listed["suppliers"])
