@@ -19,8 +19,12 @@ export const DEPARTMENTS: readonly Department[] = [inbox, operations, affiliates
  */
 export function departmentsFor(session: Session): Department[] {
   return DEPARTMENTS.flatMap((department) => {
-    if (can(session, department.holds)) return [department];
-    const sections = department.sections.filter((section) => section.holds && can(session, section.holds));
+    // A section that needs a permission of its own (`only`) is left out for anybody without it.
+    const allowed = department.sections.filter((section) => !section.only || can(session, section.only));
+    if (can(session, department.holds)) {
+      return [allowed.length === department.sections.length ? department : { ...department, sections: allowed }];
+    }
+    const sections = allowed.filter((section) => section.holds && can(session, section.holds));
     return sections.length ? [{ ...department, sections, partial: true }] : [];
   });
 }

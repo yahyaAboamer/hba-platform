@@ -246,7 +246,8 @@ describe("Adding a task", () => {
     ]);
 
     fireEvent.change(within(form).getByLabelText("Task"), { target: { value: "  Call the zip supplier " } });
-    fireEvent.change(within(form).getByLabelText("Date (optional)"), { target: { value: "2030-11-20" } });
+    fireEvent.change(within(form).getByLabelText("Deadline (optional)"), { target: { value: "2030-11-20" } });
+    fireEvent.change(within(form).getByLabelText("Next action (optional)"), { target: { value: " Ring them on Sunday " } });
     fireEvent.change(within(form).getByLabelText("Order (optional)"), { target: { value: "2" } });
     fireEvent.change(within(form).getByLabelText("Note (optional)"), { target: { value: "Ask about the minimum" } });
     fireEvent.click(within(form).getByLabelText("For the owner"));
@@ -257,7 +258,7 @@ describe("Adding a task", () => {
       expect.objectContaining({
         method: "POST",
         path: "/api/prod/tasks",
-        body: { title: "Call the zip supplier", due_on: "2030-11-20", order_id: 2, note: "Ask about the minimum", for_owner: true },
+        body: { title: "Call the zip supplier", due_on: "2030-11-20", order_id: 2, note: "Ask about the minimum", next_action: "Ring them on Sunday", for_owner: true },
       }),
     ]);
     // The form closes, the list is read again, and focus goes back to the button that opened it.
@@ -326,7 +327,7 @@ describe("A hand-added task", () => {
     fireEvent.click(edit);
     const form = formOf("Edit task");
     expect((within(form).getByLabelText("Task") as HTMLInputElement).value).toBe("Visit the new print house");
-    expect((within(form).getByLabelText("Date (optional)") as HTMLInputElement).value).toBe("2030-11-13");
+    expect((within(form).getByLabelText("Deadline (optional)") as HTMLInputElement).value).toBe("2030-11-13");
     expect((within(form).getByLabelText("Note (optional)") as HTMLTextAreaElement).value).toBe("Ask about minimums");
     expect((within(form).getByLabelText("For the owner") as HTMLInputElement).checked).toBe(false);
     fireEvent.change(within(form).getByLabelText("Task"), { target: { value: "Visit the print house" } });
@@ -336,7 +337,7 @@ describe("A hand-added task", () => {
       expect.objectContaining({
         method: "PATCH",
         path: "/api/prod/tasks/5",
-        body: { title: "Visit the print house", due_on: "2030-11-13", order_id: null, note: "Ask about minimums", for_owner: false },
+        body: { title: "Visit the print house", due_on: "2030-11-13", order_id: null, note: "Ask about minimums", next_action: null, for_owner: false },
       }),
     ]);
     expect(await screen.findByText("Visit the print house")).toBeTruthy();
@@ -370,31 +371,159 @@ describe("A hand-added task", () => {
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Today" })).toBeNull());
   });
 
-  it("is listed under done when asked, and can be reopened", async () => {
+  it("is listed on the Done tab, and can be reopened", async () => {
     const done = makeManual({ id: 8, title: "Order the swing tags", done: true, done_at: "2030-11-12T10:00:00Z", group: "done" });
-    const { calls, state } = serve(tasks(), {
+    const state = { open: tasks(), done: [done] as Task[] };
+    const calls = mockApi({
+      "GET /api/prod/tasks": (_body: unknown, call: Call) => {
+        if (!call.url.includes("view=done")) return makeTaskList(state.open);
+        return { ...makeTaskList([]), tasks: state.done };
+      },
       "PATCH /api/prod/tasks/8": () => {
-        state.tasks = state.tasks.map((task) => (task.key === "task:8" ? { ...done, done: false, done_at: null, group: "later" } : task));
+        state.done = [];
+        state.open = [...state.open, { ...done, done: false, done_at: null, group: "later" }];
         return { task: { ...done, done: false, group: "later" } };
       },
     });
     const reads = () => calls.filter((call) => call.method === "GET" && call.path === "/api/prod/tasks").map((call) => call.url);
     renderAt(ADDRESS, qc());
     await screen.findByText("Visit the new print house");
+    expect(reads()).toEqual(["/api/prod/tasks?view=open"]);
     expect(screen.queryByText("Order the swing tags")).toBeNull();
+    // The Done tab has no number until it has been read; the 14-day box is gone.
+    const openTab = screen.getByRole("button", { name: "Open · 7" });
+    expect(openTab.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Done" }).getAttribute("aria-pressed")).toBe("false");
+    expect(screen.queryByLabelText(/Show tasks done/)).toBeNull();
 
-    state.tasks = [...state.tasks, done];
-    fireEvent.click(screen.getByLabelText("Show tasks done in the last 14 days"));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
     const row = await waitFor(() => rowOf("Order the swing tags"));
-    expect(reads().at(-1)).toBe("/api/prod/tasks?done=1");
-    expect(screen.getByRole("heading", { level: 2, name: "Done in the last 14 days" })).toBeTruthy();
+    expect(reads().at(-1)).toBe("/api/prod/tasks?view=done");
+    expect(screen.getByRole("button", { name: "Done · 1" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("heading", { level: 2, name: "Done" })).toBeTruthy();
+    expect(screen.getByText("1 done")).toBeTruthy();
     expect(row.textContent).toContain("Done 12 Nov");
-    // Done tasks are not in the counts.
-    expect(screen.getByRole("button", { name: "Everything · 7" })).toBeTruthy();
+    // The who-chips are for open work only.
+    expect(screen.queryByRole("button", { name: /^Everything/ })).toBeNull();
 
     fireEvent.click(within(row).getByRole("button", { name: "Reopen: Order the swing tags" }));
     expect(await screen.findByText("Reopened: Order the swing tags")).toBeTruthy();
-    expect(writes(calls)).toEqual([expect.objectContaining({ method: "PATCH", path: "/api/prod/tasks/8", body: { done: false } })]);
+    expect(calls.filter((call) => call.method !== "GET")).toEqual([expect.objectContaining({ method: "PATCH", path: "/api/prod/tasks/8", body: { done: false } })]);
+    expect(await screen.findByText("No tasks have been marked done yet.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Open/ }));
+    expect(await screen.findByText("Order the swing tags")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open · 8" })).toBeTruthy();
+  });
+});
+
+describe("Dates", () => {
+  it("sends From and To with the tab, clears them, and refuses them the wrong way round", async () => {
+    const { calls } = serve();
+    const reads = () => calls.filter((call) => call.method === "GET" && call.path === "/api/prod/tasks").map((call) => call.url);
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Tasks" });
+    const range = screen.getByRole("group", { name: "Deadline between" });
+    fireEvent.change(within(range).getByLabelText("From"), { target: { value: "2030-11-10" } });
+    await waitFor(() => expect(reads().at(-1)).toBe("/api/prod/tasks?view=open&from=2030-11-10"));
+    fireEvent.change(within(range).getByLabelText("To"), { target: { value: "2030-11-15" } });
+    await waitFor(() => expect(reads().at(-1)).toBe("/api/prod/tasks?view=open&from=2030-11-10&to=2030-11-15"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(reads().at(-1)).toBe("/api/prod/tasks?view=done&from=2030-11-10&to=2030-11-15"));
+    expect(screen.getByRole("group", { name: "Marked done between" })).toBeTruthy();
+
+    // The wrong way round: said on the screen, and nothing is asked for.
+    const before = reads().length;
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2030-11-20" } });
+    expect((await screen.findByRole("alert")).textContent).toBe("The From date is after the To date.");
+    expect(reads()).toHaveLength(before);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear dates" }));
+    await waitFor(() => expect(reads().at(-1)).toBe("/api/prod/tasks?view=done"));
+    expect(screen.queryByRole("button", { name: "Clear dates" })).toBeNull();
+  });
+});
+
+describe("Next action and updates", () => {
+  const updated = (): ManualTask =>
+    makeManual({
+      id: 5,
+      title: "Visit the new print house",
+      due: null,
+      group: "later",
+      next_action: "Ask for a quote",
+      updates: [
+        { id: 2, text: "They sent a price list", next_action: "Ask for a quote", created_at: "2030-11-13T09:00:00Z", created_by: "Nour" },
+        { id: 1, text: "Called them", next_action: null, created_at: "2030-11-12T09:00:00Z", created_by: "Nour" },
+      ],
+      updated_at: "2030-11-13T09:00:00Z",
+    });
+
+  it("shows the next action, the latest update and every update on asking", async () => {
+    serve([updated()]);
+    renderAt(ADDRESS, qc());
+    const row = await waitFor(() => rowOf("Visit the new print house"));
+    expect(row.textContent).toContain("Next: Ask for a quote");
+    expect(row.textContent).toContain("They sent a price list");
+    expect(row.textContent).toContain("No deadline");
+    expect(row.textContent).not.toContain("Called them");
+    const more = within(row).getByRole("button", { name: /All updates \(2\)/ });
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(more);
+    expect(more.getAttribute("aria-expanded")).toBe("true");
+    expect(row.textContent).toContain("Called them");
+  });
+
+  it("posts an update with a changed next action, reads the list again and gives focus back", async () => {
+    const { calls, state } = serve([updated()], {
+      "POST /api/prod/tasks/5/updates": (body) => {
+        const sent = body as { text: string; next_action?: string | null };
+        const task = { ...updated(), next_action: sent.next_action ?? "Ask for a quote" };
+        task.updates = [{ id: 3, text: sent.text, next_action: sent.next_action ?? null, created_at: "2030-11-13T10:00:00Z", created_by: "Nour" }, ...task.updates];
+        state.tasks = [task];
+        return { task };
+      },
+    });
+    renderAt(ADDRESS, qc());
+    await screen.findByText("Visit the new print house");
+    fireEvent.click(screen.getByRole("button", { name: "Update: Visit the new print house" }));
+    const form = formOf("Update: Visit the new print house");
+    expect((within(form).getByLabelText("Next action") as HTMLInputElement).value).toBe("Ask for a quote");
+    // What happened is needed.
+    fireEvent.click(within(form).getByRole("button", { name: "Save update" }));
+    expect((await within(form).findByRole("alert")).textContent).toBe("Say what happened.");
+    expect(writes(calls)).toHaveLength(0);
+
+    fireEvent.change(within(form).getByLabelText("What happened"), { target: { value: " Quote is 40 a piece " } });
+    fireEvent.change(within(form).getByLabelText("Next action"), { target: { value: "Send the artwork" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Save update" }));
+    expect(await screen.findByText("Update saved: Visit the new print house")).toBeTruthy();
+    expect(writes(calls)).toEqual([
+      expect.objectContaining({ method: "POST", path: "/api/prod/tasks/5/updates", body: { text: "Quote is 40 a piece", next_action: "Send the artwork" } }),
+    ]);
+    await waitFor(() => expect(rowOf("Visit the new print house").textContent).toContain("Next: Send the artwork"));
+    expect(rowOf("Visit the new print house").textContent).toContain("Quote is 40 a piece");
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Update: Visit the new print house" })));
+  });
+
+  it("leaves the next action out when it was not changed", async () => {
+    const { calls } = serve([updated()], { "POST /api/prod/tasks/5/updates": () => ({ task: updated() }) });
+    renderAt(ADDRESS, qc());
+    await screen.findByText("Visit the new print house");
+    fireEvent.click(screen.getByRole("button", { name: "Update: Visit the new print house" }));
+    const form = formOf("Update: Visit the new print house");
+    fireEvent.change(within(form).getByLabelText("What happened"), { target: { value: "Still waiting" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Save update" }));
+    await screen.findByText("Update saved: Visit the new print house");
+    expect(writes(calls)[0].body).toEqual({ text: "Still waiting" });
+  });
+
+  it("is not offered to somebody who can only read", async () => {
+    serve([updated()]);
+    renderAt(ADDRESS, readOnly());
+    await screen.findByText("Visit the new print house");
+    expect(screen.queryByRole("button", { name: /^Update:/ })).toBeNull();
   });
 });
 
@@ -406,15 +535,14 @@ describe("Slow and out-of-order answers", () => {
     });
     mockApi({
       "GET /api/prod/tasks": (_body, call) =>
-        call.url.includes("done=1") ? slow : makeTaskList([makeManual({ id: 1, title: "The newer answer" })]),
+        call.url.includes("view=done") ? slow : makeTaskList([makeManual({ id: 1, title: "The newer answer" })]),
     });
     renderAt(ADDRESS, qc());
     await screen.findByText("The newer answer");
-    // Ask for the done ones (the answer is slow), then change your mind: the plain read answers first.
-    const toggle = screen.getByLabelText("Show tasks done in the last 14 days");
-    fireEvent.click(toggle);
-    fireEvent.click(toggle);
-    await waitFor(() => expect((toggle as HTMLInputElement).checked).toBe(false));
+    // Ask for the done ones (the answer is slow), then change your mind: the open read answers first.
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Open/ }));
+    await screen.findByText("The newer answer");
     release(makeTaskList([makeManual({ id: 2, title: "The older answer" })]));
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(screen.getByText("The newer answer")).toBeTruthy();
@@ -448,7 +576,7 @@ describe("On a phone", () => {
     expect(rows).toHaveLength(7);
     const sample = rowOf("Give a reason for 1 missing piece");
     expect(sample.querySelector(".prod-task__actions")).toBeTruthy();
-    expect(sample.textContent).toContain("QC manager · 12 Nov · 1 day");
+    expect(sample.textContent).toContain("QC manager · Due 12 Nov · 1 day");
     expect(within(sample).getByRole("link", { name: /^Add reason/ })).toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
     // The desktop row is not rendered at all.

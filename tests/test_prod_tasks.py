@@ -416,6 +416,9 @@ def test_a_hand_added_task_is_made_edited_done_reopened_and_deleted(owner, staff
         "done": False,
         "done_at": None,
         "for_owner": False,
+        "next_action": None,
+        "updates": [],
+        "updated_at": None,
         "group": "week",
         "overdue_days": 0,
     }
@@ -579,5 +582,5 @@ def test_the_downgrade_refuses_while_a_task_exists(owner):
     with pytest.raises(RuntimeError, match="production task"):
         command.downgrade(Config("alembic.ini"), "f6b3d8e10033")
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "e5b9a3d70038"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "f1c2d3e40039"
         assert connection.execute(text("SELECT count(*) FROM prod_task WHERE id = :id"), {"id": task["id"]}).scalar_one() == 1

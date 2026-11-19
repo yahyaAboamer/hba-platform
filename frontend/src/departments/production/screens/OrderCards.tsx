@@ -7,6 +7,7 @@
  * card that needs them is not drawn at all (the server decides, this follows).
  */
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { api } from "../../../lib/api";
 import { formatEgp } from "../../../lib/money";
@@ -15,7 +16,8 @@ import { cairoDay, pieces, plural, shortDay, stamp } from "./format";
 import { dayWords } from "../../../factory/logic";
 import { affectsFactoryPay, cutLabel, reopenable, stageStatus } from "./logic";
 import type { Panel, Powers } from "./logic";
-import type { CostPart, Delivery, DeliveryKind, HistoryEvent, OrderAnswer, OrderStage, OrderView, ProdFile, ReasonLine, Size } from "./types";
+import { NOT_SET, cogsWords, decorationWords, hexOf, rolesWords } from "./productLogic";
+import type { CostPart, Delivery, DeliveryKind, HistoryEvent, OrderAnswer, OrderStage, OrderView, ProdFile, ProdFileKind, ReasonLine, Size } from "./types";
 import { DateBox, Problem, useSubmit } from "./ui";
 import type { Run } from "./ui";
 
@@ -224,6 +226,160 @@ export function SizesCard({ order, powers, open }: CardProps) {
           . A reason is needed before this order can close.
         </div>
       ))}
+    </section>
+  );
+}
+
+// ── The product ──────────────────────────────────────────────────────────────
+
+/** A pattern can be any file (DXF, PLT, AI, ZIP...); a size chart is a photo or a PDF. */
+const FILE_WORDS: Record<ProdFileKind, { title: string; add: string; none: string; accept: string | undefined }> = {
+  pattern: { title: "Pattern files", add: "Add a pattern file", none: "No pattern file yet.", accept: undefined },
+  size_chart: { title: "Size charts", add: "Add a size chart", none: "No size chart yet.", accept: "image/jpeg,image/png,image/webp,image/gif,application/pdf" },
+};
+
+/** The product's files of one kind: each opens (a photo or PDF) or downloads (anything else) in a new tab. */
+function ProductFiles({
+  kind,
+  files,
+  editable,
+  busy,
+  onAdd,
+}: {
+  kind: ProdFileKind;
+  files: ProdFile[];
+  editable: boolean;
+  busy: boolean;
+  onAdd: (kind: ProdFileKind, file: File) => void;
+}) {
+  const picker = useRef<HTMLInputElement>(null);
+  const words = FILE_WORDS[kind];
+  return (
+    <div>
+      <dt>{words.title}</dt>
+      <dd>
+        {files.length === 0 ? (
+          <span className="prod-small">{editable ? words.none : NOT_SET}</span>
+        ) : (
+          <ul className="prod-filelist">
+            {files.map((file) => (
+              <li key={file.id}>
+                <a href={`/api/prod/files/${file.id}`} target="_blank" rel="noopener noreferrer">
+                  {file.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+        {editable && (
+          <>
+            <input
+              ref={picker}
+              type="file"
+              accept={words.accept}
+              hidden
+              aria-label={words.add}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) onAdd(kind, file);
+              }}
+            />
+            <button type="button" className="button button--row prod-filelist__add" disabled={busy} onClick={() => picker.current?.click()}>
+              {busy ? "Saving…" : words.add}
+            </button>
+          </>
+        )}
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * What the order makes: its colour, fabric, print or embroidery, who supplies it, its pattern files and
+ * size charts, and (owner only, when the server sends it) the cost of goods.
+ */
+export function ProductCard({ order, powers, open, run }: CardProps & { run: Run }) {
+  const product = order.product;
+  const { error, busy, submit } = useSubmit(run);
+  const swatch = hexOf(product.colour_code);
+  const decoration = decorationWords(product);
+  const cogs = order.cost?.cogs;
+  const editable = powers.canEdit && isOpen(order);
+
+  function add(kind: ProdFileKind, file: File) {
+    submit(
+      null,
+      async () => {
+        await api.upload(`/api/prod/orders/${order.id}/files`, file, { fields: { kind } });
+        // The order's own answer carries the product's file lists.
+        return api.get<OrderAnswer>(`/api/prod/orders/${order.id}`);
+      },
+      kind === "pattern" ? `Pattern file added: ${file.name}.` : `Size chart added: ${file.name}.`,
+    );
+  }
+
+  return (
+    <section className="prod-block" aria-labelledby="prod-product">
+      <div className="prod-block__head">
+        <h2 id="prod-product">Product</h2>
+        {powers.isOwner && isOpen(order) && (
+          <button type="button" className="button button--row" onClick={() => open({ kind: "product" })}>
+            Edit details
+          </button>
+        )}
+      </div>
+      {error && <Problem>{error}</Problem>}
+      <dl className="prod-details prod-product">
+        <div>
+          <dt>Colour</dt>
+          <dd>
+            {order.colour}
+            {product.colour_code ? (
+              <>
+                {" · "}
+                {swatch && <span className="prod-swatch" style={{ background: swatch }} aria-hidden="true" />}
+                {product.colour_code}
+              </>
+            ) : (
+              <span className="prod-small"> · code not set</span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Fabric</dt>
+          <dd>{product.fabric_type ?? <span className="prod-small">{NOT_SET}</span>}</dd>
+        </div>
+        <div>
+          <dt>Print or embroidery</dt>
+          <dd>{decoration ?? <span className="prod-small">{NOT_SET}</span>}</dd>
+        </div>
+        <div>
+          <dt>Suppliers</dt>
+          <dd>
+            {product.suppliers.length === 0 ? (
+              <span className="prod-small">{NOT_SET}</span>
+            ) : (
+              <ul className="prod-filelist">
+                {product.suppliers.map((supplier) => (
+                  <li key={supplier.id}>
+                    <Link to={`/production/suppliers/${supplier.id}`}>{supplier.name}</Link>
+                    <span className="prod-small"> · {rolesWords(supplier.roles)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </dd>
+        </div>
+        <ProductFiles kind="pattern" files={product.pattern_files} editable={editable} busy={busy} onAdd={add} />
+        <ProductFiles kind="size_chart" files={product.size_charts} editable={editable} busy={busy} onAdd={add} />
+        {cogs && (
+          <div>
+            <dt>COGS</dt>
+            <dd>{cogsWords(cogs)}</dd>
+          </div>
+        )}
+      </dl>
     </section>
   );
 }

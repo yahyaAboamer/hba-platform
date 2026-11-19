@@ -1,5 +1,10 @@
 """Photos and PDFs on a production order, in the platform's file bucket.
 
+A file may be one of the product's own (build plan 2026-11-19): its ``pattern``
+(a photo, a PDF or any other file, such as DXF, PLT, AI or ZIP: anything that is
+not a photo or PDF is kept as ``application/octet-stream`` and only ever
+downloaded) or its ``size_chart`` (a photo or PDF).
+
 The platform's file bucket, a first-bytes check and a size limit; keys are
 built here, never from what a browser sent, under ``production/orders/{order_id}/``.
 A file is taken off an order by ``deleted_at``; the stored copy stays.
@@ -12,13 +17,16 @@ from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
 from app.modules.inbox.public import file_bucket
-from app.modules.production.orders.models import STAGE_LABELS, STAGES, ProdOrder, ProdOrderFile
+from app.modules.production.orders.models import FILE_KINDS, STAGE_LABELS, STAGES, ProdOrder, ProdOrderFile
 from app.modules.production.orders.services.orders import Locked, NotFound, Refused, _audit, _iso, _order, _people
 from app.shared.models.identity import UserAccount
 
 __all__ = ["MAX_BYTES", "add", "for_download", "listing", "remove"]
 
 PDF = "application/pdf"
+#: What a pattern file that is not a photo or PDF is stored and served as.
+OTHER = "application/octet-stream"
+KIND_WORDS = {"pattern": "pattern file", "size_chart": "size chart"}
 MAX_BYTES = 20 * 1024 * 1024
 
 
@@ -56,6 +64,7 @@ def view(row: ProdOrderFile, people: dict[int, str]) -> dict:
         "id": row.id,
         "name": row.name,
         "stage": row.stage,
+        "kind": row.kind,
         "mime_type": row.mime_type,
         "size_bytes": row.size_bytes,
         "created_at": _iso(row.created_at),
@@ -79,7 +88,8 @@ def listing(db: Session, order_id: int) -> list[dict]:
 
 
 def add(
-    db: Session, order_id: int, *, filename: str, content: bytes, stage: str | None, actor: UserAccount
+    db: Session, order_id: int, *, filename: str, content: bytes, stage: str | None, actor: UserAccount,
+    kind: str | None = None,
 ) -> dict:
     """Check a file, record it and store it. Staged; the route commits.
 
@@ -93,23 +103,30 @@ def add(
     stage = (stage or "").strip() or None
     if stage is not None and stage not in STAGES:
         raise Refused(f"{stage} is not a stage.")
+    # Anything but the two kinds is an ordinary file.
+    kind = kind if kind in FILE_KINDS else None
     if not content:
         raise Refused("Choose a file to upload.")
     if len(content) > MAX_BYTES:
         raise Refused("Files must be 20 MB or smaller.")
     mime = file_type(content)
     if mime is None:
-        raise Refused("Use a JPG, PNG, WebP or GIF photo, or a PDF.")
-    name = " ".join((filename or "").split())[:255] or ("Document" if mime == PDF else "Photo")
+        if kind != "pattern":
+            raise Refused("Use a JPG, PNG, WebP or GIF photo, or a PDF.")
+        mime = OTHER
+    name = " ".join((filename or "").split())[:255] or (
+        "Pattern" if mime == OTHER else "Document" if mime == PDF else "Photo"
+    )
     key = f"production/orders/{order.id}/{uuid.uuid4()}"
     row = ProdOrderFile(
-        order_id=order.id, stage=stage, name=name, storage_key=key, mime_type=mime,
+        order_id=order.id, stage=stage, kind=kind, name=name, storage_key=key, mime_type=mime,
         size_bytes=len(content), uploaded_by=actor.id,
     )
     db.add(row)
     db.flush()
     where = f" to {STAGE_LABELS[stage]}" if stage else ""
-    _audit(db, order, actor, "file_added", f"Added {name}{where} on {order.code}", file=row.id)
+    what = f" as the {KIND_WORDS[kind]}" if kind else ""
+    _audit(db, order, actor, "file_added", f"Added {name}{what}{where} on {order.code}", file=row.id)
     file_bucket().put(key, content, mime)
     return view(row, _people(db, [actor.id]))
 

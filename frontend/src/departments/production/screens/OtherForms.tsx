@@ -11,6 +11,8 @@ import { shortDay } from "./format";
 import { COST_LABELS, COST_PARTS, blankCounts, blankCost, cancelSentence, isBlank, totalOf, unreadable, whole, NOT_WHOLE } from "./logic";
 import type { Counts, CostText } from "./logic";
 import { OrderFields, draftBody, draftFromOrder, draftProblem } from "./OrderFields";
+import { productBody, productDraft, productProblem } from "./productLogic";
+import type { ProductDraft } from "./productLogic";
 import type { Choices, OrderAnswer, OrderView, Size, StageKey } from "./types";
 import { Actions, PanelShell, Problem, SizeInputs, TextBox, DateBox, useSubmit } from "./ui";
 import type { Run } from "./ui";
@@ -362,3 +364,32 @@ export function EditForm({ order, run, onClose }: FormProps) {
   );
 }
 
+
+/** The product's details: colour code, fabric, print or embroidery type and its width. Blank is "Not set". */
+export function ProductForm({ order, run, onClose }: FormProps) {
+  const [draft, setDraft] = useState<ProductDraft>(() => productDraft(order.product));
+  const { error, busy, submit } = useSubmit(run);
+  const set = (patch: Partial<ProductDraft>) => setDraft((before) => ({ ...before, ...patch }));
+  return (
+    <PanelShell title="Edit product details" intro="Leave a box empty for Not set." onClose={onClose}>
+      <form
+        className="prod-form"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit(
+            productProblem(draft),
+            () => api.patch<OrderAnswer>(`/api/prod/orders/${order.id}`, productBody(draft)),
+            "Product details saved.",
+          );
+        }}
+      >
+        <TextBox label="Colour code" hint="Like Pantone 19-0303 or #2F3A2F" value={draft.colourCode} onChange={(value) => set({ colourCode: value })} max={40} />
+        <TextBox label="Fabric type" hint="Like Cotton fleece 320 gsm" value={draft.fabricType} onChange={(value) => set({ fabricType: value })} max={120} />
+        <TextBox label="Print or embroidery type" hint="Like DTF print or Puff embroidery" value={draft.decorationType} onChange={(value) => set({ decorationType: value })} max={120} />
+        <TextBox label="Print or embroidery width, cm" value={draft.width} onChange={(value) => set({ width: value })} inputMode="decimal" />
+        <Actions error={error} busy={busy} label="Save details" working="Saving…" />
+      </form>
+    </PanelShell>
+  );
+}

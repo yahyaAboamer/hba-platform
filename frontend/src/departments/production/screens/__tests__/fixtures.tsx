@@ -22,6 +22,7 @@ import type {
   OrderRow,
   OrderStage,
   OrderView,
+  ProductDetails,
   Settlement,
   SizeLine,
   StageKey,
@@ -199,6 +200,7 @@ export function makeOrder(
     fix_not_returned: at > STAGE_KEYS.indexOf("final_inspection") ? 0 : null,
     files_count: 0,
     warehouse_done_on: null,
+    product: emptyProduct(),
     ...options.extra,
   };
   if (options.money) {
@@ -206,6 +208,19 @@ export function makeOrder(
     order.settlement = cutDone ? settlement() : null;
   }
   return order;
+}
+
+/** An order's product with nothing set but its factory. */
+export function emptyProduct(): ProductDetails {
+  return {
+    colour_code: null,
+    fabric_type: null,
+    decoration_type: null,
+    decoration_width_cm: null,
+    suppliers: [{ id: "SUP-1", name: "Main factory", roles: ["Factory"] }],
+    pattern_files: [],
+    size_charts: [],
+  };
 }
 
 export function cost(): Cost {
@@ -310,6 +325,9 @@ export function makeManual(over: Partial<ManualTask> & { id: number; title: stri
     done: false,
     done_at: null,
     for_owner: false,
+    next_action: null,
+    updates: [],
+    updated_at: null,
     group: "later",
     overdue_days: 0,
     ...over,

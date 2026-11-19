@@ -6,7 +6,7 @@
  */
 import { cairoDay, daysBetween, plural, shortDay, weekdayOf } from "./format";
 import type { Powers } from "./logic";
-import type { GeneratedTask, ManualTask, Task, TaskCounts, TaskGroup } from "./types";
+import type { GeneratedTask, ManualTask, Task, TaskCounts, TaskGroup, TaskUpdate, TaskView } from "./types";
 
 // ── Filters and groups ───────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ export const GROUP_LABELS: Record<TaskGroup, string> = {
   today: "Today",
   week: "This week",
   later: "Later",
-  done: "Done in the last 14 days",
+  done: "Done",
 };
 
 export const EMPTY_WORDS: Record<Filter, string> = {
@@ -68,19 +68,48 @@ export function summarySentence(counts: TaskCounts, tasks: readonly Task[], toda
   return parts.join(" · ");
 }
 
+/** "4 done", for the Done tab. */
+export const doneSentence = (count: number): string => `${count} done`;
+
+// ── The list's address ───────────────────────────────────────────────────────
+
+/** The date range a person picked; either end may be empty. */
+export type Range = { from: string; to: string };
+
+/** The refusal for a range the wrong way round, before anything is sent; `null` when it reads. */
+export function rangeProblem(range: Range): string | null {
+  return range.from && range.to && range.from > range.to ? "The From date is after the To date." : null;
+}
+
+/** `/api/prod/tasks?view=open&from=…&to=…`: the bounds the person gave, nothing for an empty one. */
+export function tasksAddress(view: TaskView, range: Range): string {
+  const query = new URLSearchParams({ view });
+  if (range.from) query.set("from", range.from);
+  if (range.to) query.set("to", range.to);
+  return `/api/prod/tasks?${query.toString()}`;
+}
+
+/** What the empty list says on the Done tab, or on the Open tab with a date range. */
+export function emptyWords(view: TaskView, filter: Filter, range: Range): string {
+  const ranged = Boolean(range.from || range.to);
+  if (view === "done") return ranged ? "No tasks were marked done in these dates." : "No tasks have been marked done yet.";
+  if (ranged && filter === "all") return "Nothing is due in these dates. Tasks with no deadline are left out while dates are set.";
+  return EMPTY_WORDS[filter];
+}
+
 // ── The words on a row ───────────────────────────────────────────────────────
 
 /** "Zip hoodie · Olive · PO-2611-03". */
 export const orderName = (task: Task): string | null =>
   task.order ? `${task.order.style_name} · ${task.order.colour} · ${task.order.code}` : null;
 
-/** The date, and how late when it is: "10 Nov · 3 days". */
+/** The deadline, and how late when it is past: "Due 10 Nov · 3 days", "No deadline". */
 export function dueWords(task: Task): string {
   if (task.kind === "manual" && task.done) return `Done ${shortDay(cairoDay(task.done_at))}`;
-  if (!task.due) return "No date";
-  if (task.group === "overdue") return `${shortDay(task.due)} · ${plural(task.overdue_days, "day")}`;
+  if (!task.due) return "No deadline";
+  if (task.group === "overdue") return `Due ${shortDay(task.due)} · ${plural(task.overdue_days, "day")}`;
   // The factory finishes making around its promised date; nobody can say the day.
-  return task.stage === "making" ? `around ${shortDay(task.due)}` : shortDay(task.due);
+  return task.stage === "making" ? `Due around ${shortDay(task.due)}` : `Due ${shortDay(task.due)}`;
 }
 
 /** Who it is waiting on, and for how long: "waiting on Main factory for 3 days", "waiting 3 days". */
@@ -160,3 +189,23 @@ export function taskLink(task: GeneratedTask, powers: Powers): TaskLink | null {
 }
 
 export const isManual = (task: Task): task is ManualTask => task.kind === "manual";
+
+// ── Next action and updates ──────────────────────────────────────────────────
+
+/** How long ago an instant was: "just now", "5 min ago", "2 h ago", else the Cairo day ("12 Nov"). */
+export function agoWords(iso: string | null, now: Date = new Date()): string {
+  if (!iso) return "";
+  const moment = new Date(iso);
+  if (Number.isNaN(moment.getTime())) return "";
+  const minutes = Math.floor((now.getTime() - moment.getTime()) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} h ago`;
+  return shortDay(cairoDay(iso));
+}
+
+/** "Update · 2 h ago: the fabric is at the cutter". */
+export function updateLine(update: TaskUpdate, now?: Date): string {
+  const when = agoWords(update.created_at, now);
+  return `Update${when ? ` · ${when}` : ""}: ${update.text}`;
+}

@@ -26,8 +26,11 @@ A refusal rolls back whatever was staged; success commits.
 """
 
 import logging
+import re
 from datetime import date
+from decimal import Decimal
 from typing import Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
@@ -100,6 +103,11 @@ class NewOrder(BaseModel):
     #: Overrides of the dates filled in backwards from the target date.
     expected_dates: dict[Stage, date] | None = None
     notes: str | None = Field(default=None, max_length=4000)
+    #: The product's details (build plan 2026-11-19); blank is none.
+    colour_code: str | None = Field(default=None, max_length=200)
+    fabric_type: str | None = Field(default=None, max_length=400)
+    decoration_type: str | None = Field(default=None, max_length=400)
+    decoration_width_cm: Decimal | None = Field(default=None, allow_inf_nan=False, max_digits=12)
 
 
 class OrderEdit(BaseModel):
@@ -124,6 +132,11 @@ class OrderEdit(BaseModel):
     actual_printing_piastres: int | None = Field(default=None, ge=0, le=orders.MAX_PART_PIASTRES)
     actual_accessories_piastres: int | None = Field(default=None, ge=0, le=orders.MAX_PART_PIASTRES)
     actual_packaging_piastres: int | None = Field(default=None, ge=0, le=orders.MAX_PART_PIASTRES)
+    #: The product's details; ``null`` or blank clears one. Only while the order is open.
+    colour_code: str | None = Field(default=None, max_length=200)
+    fabric_type: str | None = Field(default=None, max_length=400)
+    decoration_type: str | None = Field(default=None, max_length=400)
+    decoration_width_cm: Decimal | None = Field(default=None, allow_inf_nan=False, max_digits=12)
 
 
 class StageEdit(BaseModel):
@@ -218,6 +231,7 @@ class NewTask(BaseModel):
     order_id: int | None = Field(default=None, ge=1, le=2_147_483_647)
     note: str | None = Field(default=None, max_length=4000)
     for_owner: bool = False
+    next_action: str | None = Field(default=None, max_length=1000)
 
 
 class TaskEdit(BaseModel):
@@ -230,6 +244,16 @@ class TaskEdit(BaseModel):
     note: str | None = Field(default=None, max_length=4000)
     for_owner: bool | None = None
     done: bool | None = None
+    #: ``null`` or blank clears it.
+    next_action: str | None = Field(default=None, max_length=1000)
+
+
+class TaskUpdate(BaseModel):
+    """A follow-up line. ``next_action`` sent (even ``null``) also replaces the
+    task's next action; left out, it stays."""
+
+    text: str = Field(max_length=4000)
+    next_action: str | None = Field(default=None, max_length=1000)
 
 
 # ── Orders ────────────────────────────────────────────────────────────────────
@@ -438,11 +462,21 @@ def _task_write(db: Session, act) -> dict:
 
 
 @router.get("/tasks")
-def task_list(done: bool = Query(False), db: Session = Depends(get_session)) -> dict:
+def task_list(
+    done: bool = Query(False),
+    view: Literal["open", "done"] = Query("open"),
+    from_: date | None = Query(None, alias="from"),
+    to: date | None = Query(None),
+    db: Session = Depends(get_session),
+) -> dict:
     """Every open task, grouped by when it is due, and the counts the filters
-    show. ``done=1`` adds the hand-added tasks done in the last 14 days. No
-    money, for anybody."""
-    return tasks.listing(db, show_done=done)
+    show. ``done=1`` adds the hand-added tasks done in the last 14 days.
+    ``view=done`` is every hand-added task marked done, newest first.
+    ``from``/``to`` (inclusive) keep the open tasks whose deadline is inside,
+    or the done ones marked done inside (Cairo's date). No money, for anybody."""
+    if from_ is not None and to is not None and from_ > to:
+        raise HTTPException(422, "The From date is after the To date. Swap them or clear one.")
+    return tasks.listing(db, show_done=done, view=view, start=from_, end=to)
 
 
 @router.get("/incoming")
@@ -474,6 +508,16 @@ def edit_task(
     return _task_write(db, lambda: tasks.edit(db, task_id, data, actor))
 
 
+@router.post("/tasks/{task_id}/updates", status_code=201)
+def add_task_update(
+    task_id: int, body: TaskUpdate, actor: UserAccount = Depends(EDIT), db: Session = Depends(get_session)
+) -> dict:
+    """What happened on a task, and (when sent) its next action. A done task
+    may take one too; a deleted one is 404."""
+    data = body.model_dump(exclude_unset=True)
+    return _task_write(db, lambda: tasks.add_update(db, task_id, data, actor))
+
+
 @router.delete("/tasks/{task_id}")
 def delete_task(task_id: int, actor: UserAccount = Depends(EDIT), db: Session = Depends(get_session)) -> dict:
     try:
@@ -500,8 +544,9 @@ def order_files(order_id: int, db: Session = Depends(get_session)) -> dict:
 async def add_file(
     order_id: int, request: Request, actor: UserAccount = Depends(EDIT), db: Session = Depends(get_session)
 ) -> dict:
-    """A photo or PDF, multipart: ``file`` and an optional ``stage``. Refused
-    before reading when too large or of no stated size."""
+    """A photo or PDF, multipart: ``file``, an optional ``stage`` and an
+    optional ``kind`` (``pattern``, which may be any file, or ``size_chart``).
+    Refused before reading when too large or of no stated size."""
     if too_large(request):
         raise HTTPException(413, "Files must be 20 MB or smaller.")
     form = await request.form()
@@ -510,10 +555,14 @@ async def add_file(
     filename = getattr(upload, "filename", None) or ""
     stage = form.get("stage")
     stage = stage if isinstance(stage, str) else None
+    kind = form.get("kind")
+    kind = kind.strip() if isinstance(kind, str) else None
 
     def store() -> dict:
         try:
-            saved = files.add(db, order_id, filename=filename, content=content, stage=stage, actor=actor)
+            saved = files.add(
+                db, order_id, filename=filename, content=content, stage=stage, actor=actor, kind=kind
+            )
         except orders.NotFound as exc:
             db.rollback()
             raise HTTPException(404, str(exc)) from None
@@ -530,6 +579,14 @@ async def add_file(
     return await run_in_threadpool(store)
 
 
+def _attachment(name: str) -> str:
+    """``attachment`` with the file's name, safely quoted: an ASCII fallback
+    (no quote, backslash or control character) and the name itself, percent-encoded
+    (RFC 5987/6266)."""
+    fallback = re.sub(r'[^A-Za-z0-9 ._()\-]', "_", name).strip() or "file"
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(name, safe='')}"
+
+
 @router.get("/files/{file_id}")
 def one_file(file_id: int, db: Session = Depends(get_session)) -> Response:
     row = files.for_download(db, file_id)
@@ -543,7 +600,9 @@ def one_file(file_id: int, db: Session = Depends(get_session)) -> Response:
         content,
         media_type=row.mime_type,
         headers={
-            "Content-Disposition": "inline",
+            # A photo or PDF opens in the browser; any other pattern file is
+            # only ever downloaded, never shown.
+            "Content-Disposition": "inline" if row.mime_type != files.OTHER else _attachment(row.name),
             "X-Content-Type-Options": "nosniff",
             # No Cache-Control here: the app marks every API response
             # no-store (app/main.py), which is right for a production file too.
@@ -587,8 +646,9 @@ def save_stage_days(
 
 @router.get("/choices")
 def choices(db: Session = Depends(get_session)) -> dict:
-    """What the New order form needs: active suppliers, active Shopify
-    products, the sizes and the typical days per stage."""
+    """What the New order form needs: active suppliers, the active and draft
+    Shopify products (with status and picture), the sizes and the typical days
+    per stage."""
     return orders.choices(db)
 
 

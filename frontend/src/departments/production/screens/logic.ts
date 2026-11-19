@@ -341,6 +341,7 @@ export type Panel =
   | { kind: "reopen"; stage: StageKey }
   | { kind: "cancel" }
   | { kind: "edit" }
+  | { kind: "product" }
   | { kind: "actual" }
   | { kind: "rate"; fresh: boolean };
 

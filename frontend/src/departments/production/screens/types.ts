@@ -145,6 +145,35 @@ export type Cost = {
   piece_cost_piastres: number;
   /** Owner only: what the purchases for this order say each part costs per piece (batch 4). */
   from_purchases?: FromPurchases;
+  /** Owner only: the cost of goods, a piece and for the pieces this order makes. */
+  cogs?: Cogs;
+};
+
+/** `cost.cogs`: the piece cost (actual where typed, else target) times the pieces, on the basis given. */
+export type Cogs = {
+  per_piece_piastres: number;
+  pieces: number;
+  /** Passed once the final inspection is done, else cut once cutting is done, else planned. */
+  pieces_basis: "passed" | "cut" | "planned";
+  total_piastres: number;
+};
+
+/** Who supplies the product: names and roles only, never money. */
+export type ProductSupplier = { id: string; name: string; roles: string[] };
+
+/** `view.product`: the product's details, for everybody who reads Production. */
+export type ProductDetails = {
+  colour_code: string | null;
+  fabric_type: string | null;
+  /** Print or embroidery type. */
+  decoration_type: string | null;
+  /** Its width in cm, a string with one decimal (`"12.5"`), or `null`. */
+  decoration_width_cm: string | null;
+  suppliers: ProductSupplier[];
+  /** Newest first. */
+  pattern_files: ProdFile[];
+  /** Newest first. */
+  size_charts: ProdFile[];
 };
 
 /** The four parts a purchase can be of that an order's cost also has. Manufacturing is never bought. */
@@ -220,6 +249,7 @@ export type OrderView = OrderRow & {
   fix_not_returned: number | null;
   files_count: number;
   warehouse_done_on: string | null;
+  product: ProductDetails;
   /** Owner only. */
   cost?: Cost;
   /** Owner only; `null` until cutting is done. */
@@ -231,10 +261,14 @@ export type OrderAnswer = { order: OrderView; delivery_id?: number };
 
 export type HistoryEvent = { id: number; at: string | null; who: string | null; action: string; summary: string | null };
 
+/** What an order's file is for, when it is one of the product's: a pattern or a size chart. */
+export type ProdFileKind = "pattern" | "size_chart";
+
 export type ProdFile = {
   id: number;
   name: string;
   stage: StageKey | null;
+  kind?: ProdFileKind | null;
   mime_type: string;
   size_bytes: number;
   created_at: string | null;
@@ -250,9 +284,12 @@ export type StageDaysRow = {
   updated_by: string | null;
 };
 
+export type ChoiceProduct = { id: string; title: string; status: "active" | "draft"; image_url: string | null };
+
 export type Choices = {
   suppliers: { id: string; name: string; category: string | null }[];
-  products: { id: string; title: string }[];
+  /** Active and draft products, each with its first image when it has one. */
+  products: ChoiceProduct[];
   sizes: Size[];
   stage_days: Record<string, number>;
 };
@@ -292,6 +329,17 @@ export type GeneratedTask = TaskCommon & {
   open: string | null;
 };
 
+/** One update on a hand-added task. Never edited. */
+export type TaskUpdate = {
+  id: number;
+  text: string;
+  /** What the next action was set to by this update, when it changed it. */
+  next_action: string | null;
+  created_at: string | null;
+  /** The name of who wrote it. */
+  created_by: string | null;
+};
+
 /** Typed in by somebody. */
 export type ManualTask = TaskCommon & {
   kind: "manual";
@@ -301,6 +349,11 @@ export type ManualTask = TaskCommon & {
   done: boolean;
   done_at: string | null;
   for_owner: boolean;
+  next_action: string | null;
+  /** Newest first. */
+  updates: TaskUpdate[];
+  /** The newest update's time, or `null`. */
+  updated_at: string | null;
 };
 
 export type Task = GeneratedTask | ManualTask;
@@ -311,6 +364,41 @@ export type TaskList = { today: string; counts: TaskCounts; tasks: Task[] };
 
 /** What a write to a hand-added task answers with. */
 export type TaskAnswer = { task: ManualTask };
+
+/** Which tasks the list holds: what is still to do, or hand-added tasks marked done. */
+export type TaskView = "open" | "done";
+
+// ── Payments (`GET /api/prod/payments`), owner only ──────────────────────────
+
+export type PaymentPhoto = { id: number; mime_type: string; size_bytes: number; created_at: string | null };
+
+export type PaymentRow = {
+  id: number;
+  supplier: { id: string; name: string };
+  amount_piastres: number;
+  paid_on: string;
+  method: PayMethod;
+  method_label: string;
+  kind: PayKind;
+  kind_label: string;
+  note: string | null;
+  reversed: boolean;
+  created_by: string | null;
+  photos: PaymentPhoto[];
+};
+
+export type PaymentList = {
+  from: string | null;
+  to: string | null;
+  /** Of the listed payments that were not reversed. */
+  total_piastres: number;
+  /** Newest `paid_on` first. */
+  payments: PaymentRow[];
+  suppliers: { id: string; name: string }[];
+};
+
+/** What adding or removing a photo answers with. */
+export type PaymentAnswer = { payment: PaymentRow };
 
 // ── Incoming (`app/modules/production/orders/services/incoming.py`) ──────────
 // No money in any of it, for anybody.

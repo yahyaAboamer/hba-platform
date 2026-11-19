@@ -37,6 +37,11 @@ export type DepartmentSection = {
    * Khazenly and nothing else of Operations).
    */
   holds?: string;
+  /**
+   * A permission without which the section is left out even for someone who
+   * holds the department's (Production → Payments is money: `production.owner`).
+   */
+  only?: string;
 };
 
 /** One department, declared once: the frame, the router and the menu read this. */

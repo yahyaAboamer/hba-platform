@@ -11,10 +11,15 @@ import { COST_LABELS, COST_PARTS, blankCost, blankCounts, costTotal, countsFrom,
 import type { Counts, CostText } from "./logic";
 import type { Choices, FabricBuyer, OrderView, Printing } from "./types";
 import { SIZES } from "./types";
+import { StylePicker } from "./StylePicker";
+import type { StyleOption } from "./StylePicker";
 import { DateBox, SizeInputs, TextBox } from "./ui";
 
 /** The product select's value for "a style that is not on Shopify yet". */
 export const NEW_STYLE = "__new";
+
+/** The last line of the style list, always offered. */
+const NEW_STYLE_OPTION: StyleOption = { id: NEW_STYLE, title: "A new style, not on Shopify yet" };
 
 export type OrderDraft = {
   /** A Shopify product id, `NEW_STYLE`, or `""` for not chosen yet. */
@@ -162,34 +167,29 @@ export function OrderFields({
 
   return (
     <>
-      <div className="prod-field">
-        <label className="field__label" htmlFor={`${id}-style`}>
-          Style, from the product list
-        </label>
-        <select
-          id={`${id}-style`}
-          className="input"
-          value={draft.productId}
-          onChange={(event) => {
-            const picked = event.target.value;
-            const product = choices.products.find((candidate) => candidate.id === picked);
-            onChange({
-              ...draft,
-              productId: picked,
-              styleName: product ? product.title : picked === NEW_STYLE ? (draft.productId === NEW_STYLE ? draft.styleName : "") : "",
-            });
-          }}
-        >
-          <option value="">Choose a style…</option>
-          {choices.products.map((product) => (
-            <option key={product.id} value={product.id}>
-              {product.title}
-            </option>
-          ))}
-          {draft.productId && draft.productId !== NEW_STYLE && !known && <option value={draft.productId}>{draft.styleName}</option>}
-          <option value={NEW_STYLE}>A new style, not on Shopify yet</option>
-        </select>
-      </div>
+      <StylePicker
+        label="Style, from the product list"
+        products={choices.products}
+        value={draft.productId}
+        extra={draft.productId && draft.productId !== NEW_STYLE && !known ? { id: draft.productId, title: draft.styleName } : null}
+        newStyle={NEW_STYLE_OPTION}
+        onPick={(picked) => {
+          const product = choices.products.find((candidate) => candidate.id === picked);
+          onChange({
+            ...draft,
+            productId: picked,
+            styleName: product
+              ? product.title
+              : picked === NEW_STYLE
+                ? draft.productId === NEW_STYLE
+                  ? draft.styleName
+                  : ""
+                : picked === draft.productId
+                  ? draft.styleName
+                  : "",
+          });
+        }}
+      />
       {draft.productId === NEW_STYLE && (
         <TextBox label="Style name" value={draft.styleName} onChange={(value) => set("styleName", value)} max={180} />
       )}

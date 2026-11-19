@@ -17,6 +17,7 @@ Lateness is calculated, never stored. "Today" is Cairo's date.
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
@@ -39,6 +40,7 @@ from app.modules.production.orders.models import (
     ProdOrderReason,
     ProdOrderSize,
     ProdOrderStage,
+    ProdPurchase,
     ProdStageDays,
 )
 from app.shared.models.audit import AuditEvent
@@ -441,14 +443,19 @@ def choices(db: Session) -> dict:
         .where(ProductionSupplier.active.is_(True), ProductionSupplier.deleted_at.is_(None))
         .order_by(ProductionSupplier.name)
     ).all()
+    # A style may be made before it is on sale, so draft products are offered
+    # too (the owner, 19 November 2026); archived ones are not.
     products = db.execute(
-        select(Product.shopify_product_id, Product.title)
-        .where(Product.status == ProductStatus.ACTIVE)
-        .order_by(Product.title)
+        select(Product.shopify_product_id, Product.title, Product.status, Product.image_url)
+        .where(Product.status.in_((ProductStatus.ACTIVE, ProductStatus.DRAFT)))
+        .order_by(Product.title, Product.shopify_product_id)
     ).all()
     return {
         "suppliers": [{"id": sid, "name": name, "category": category} for sid, name, category in suppliers],
-        "products": [{"id": pid, "title": title} for pid, title in products],
+        "products": [
+            {"id": pid, "title": title, "status": status, "image_url": image_url}
+            for pid, title, status, image_url in products
+        ],
         "sizes": list(SIZES),
         "stage_days": stage_days(db),
     }
@@ -466,6 +473,40 @@ def _supplier(db: Session, supplier_id: str | None, what: str, keep: str | None 
     if not supplier.active and not staying:
         raise Refused(f"{supplier.name} is not an active supplier.")
     return supplier
+
+
+#: The most a print or embroidery may be wide, in cm.
+MAX_DECORATION_WIDTH = Decimal("999.9")
+
+
+def _width(value) -> Decimal | None:
+    """A print or embroidery width in cm, to one decimal; blank is none."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    if isinstance(value, bool):
+        raise Refused("Give the print / embroidery width in cm, like 12.5.")
+    try:
+        width = Decimal(str(value).strip()).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    except (InvalidOperation, ValueError):
+        raise Refused("Give the print / embroidery width in cm, like 12.5.") from None
+    if not width.is_finite() or width <= 0:
+        raise Refused("The print / embroidery width must be more than 0 cm.")
+    if width > MAX_DECORATION_WIDTH:
+        raise Refused("The print / embroidery width can be at most 999.9 cm.")
+    return width
+
+
+def _width_text(width: Decimal | None) -> str | None:
+    return None if width is None else f"{width.quantize(Decimal('0.1'))}"
+
+
+#: The product's text details an order holds, each with how long it may be and
+#: the words its history uses (build plan 2026-11-19). No money.
+_DETAILS = {
+    "colour_code": (40, "colour code"),
+    "fabric_type": (120, "fabric type"),
+    "decoration_type": (120, "print / embroidery type"),
+}
 
 
 def _product(db: Session, product_id: str | None) -> str | None:
@@ -527,6 +568,10 @@ def create(db: Session, data: dict, actor: UserAccount) -> ProdOrder:
         sample_status="none" if repeat else "pending",
         status="open",
         notes=_text(data.get("notes"), limit=2000, what="the notes"),
+        colour_code=_text(data.get("colour_code"), limit=40, what="the colour code"),
+        fabric_type=_text(data.get("fabric_type"), limit=120, what="the fabric type"),
+        decoration_type=_text(data.get("decoration_type"), limit=120, what="the print / embroidery type"),
+        decoration_width_cm=_width(data.get("decoration_width_cm")),
         created_by=actor.id,
     )
     for part in COST_PARTS:
@@ -582,6 +627,10 @@ _BASICS = {
     "print_supplier_id": "print house",
     "target_date": "target date",
     "notes": "notes",
+    "colour_code": "colour code",
+    "fabric_type": "fabric type",
+    "decoration_type": "print / embroidery type",
+    "decoration_width_cm": "print / embroidery width",
 }
 
 
@@ -638,6 +687,11 @@ def edit(db: Session, order_id: int, data: dict, actor: UserAccount) -> ProdOrde
         put("target_date", data["target_date"])
     if "notes" in data:
         put("notes", _text(data["notes"], limit=2000, what="the notes"))
+    for column, (limit, words) in _DETAILS.items():
+        if column in data:
+            put(column, _text(data[column], limit=limit, what=f"the {words}"))
+    if "decoration_width_cm" in data:
+        put("decoration_width_cm", _width(data["decoration_width_cm"]))
 
     if data.get("planned") is not None:
         if facts.done("cutting"):
@@ -1377,6 +1431,26 @@ def cost(order: ProdOrder) -> dict:
     }
 
 
+def cogs(facts: Facts) -> dict:
+    """What the product costs to make: the piece cost (actual where typed,
+    else target) over the pieces passed once the final inspection is done,
+    else those cut once cutting is done, else those planned. **The owner's.**"""
+    if facts.done("final_inspection"):
+        basis = "passed"
+    elif facts.done("cutting"):
+        basis = "cut"
+    else:
+        basis = "planned"
+    pieces = facts.total(basis)
+    per_piece = piece_cost(facts.order)
+    return {
+        "per_piece_piastres": per_piece,
+        "pieces": pieces,
+        "pieces_basis": basis,
+        "total_piastres": per_piece * pieces,
+    }
+
+
 def settlement(facts: Facts) -> dict:
     """What the factory is owed for this order (ADR 0084, decision 8)."""
     order = facts.order
@@ -1688,6 +1762,76 @@ def rows(db: Session, status: str) -> list[dict]:
     return [_row(facts[order.id], suppliers, on) for order in orders]
 
 
+#: The role a purchase's part gives its supplier on the product.
+_PURCHASE_ROLES = {
+    "fabric": "Fabric",
+    "printing": "Printing",
+    "accessories": "Accessories",
+    "packaging": "Packaging",
+    "other": "Other",
+}
+#: The order roles are told in: the factory's, the print house's, then the purchases'.
+_ROLE_ORDER = ("Factory", "Printing", "Fabric", "Accessories", "Packaging", "Other")
+
+
+def product_suppliers(db: Session, order: ProdOrder) -> list[dict]:
+    """Who supplies this product, by name and role, **no money**: the factory,
+    the outside print house, and the supplier of every purchase tied to the
+    order that is not voided. One entry a supplier; the factory first, then by
+    name."""
+    roles: dict[str, set[str]] = {order.factory_id: {"Factory"}}
+    if order.printing == "outside" and order.print_supplier_id:
+        roles.setdefault(order.print_supplier_id, set()).add("Printing")
+    for supplier_id, part in db.execute(
+        select(ProdPurchase.supplier_id, ProdPurchase.cost_part).where(
+            ProdPurchase.order_id == order.id, ProdPurchase.voided_at.is_(None)
+        )
+    ).all():
+        roles.setdefault(supplier_id, set()).add(_PURCHASE_ROLES.get(part, "Other"))
+    names = _suppliers(db, roles)
+    ordered = sorted(roles, key=lambda sid: (sid != order.factory_id, (names.get(sid) or "").lower(), sid))
+    return [
+        {"id": sid, "name": names.get(sid), "roles": [role for role in _ROLE_ORDER if role in roles[sid]]}
+        for sid in ordered
+    ]
+
+
+def _product_files(db: Session, order_id: int) -> dict[str, list[dict]]:
+    from app.modules.production.orders.services import files  # files imports this module
+
+    rows = list(
+        db.scalars(
+            select(ProdOrderFile)
+            .where(
+                ProdOrderFile.order_id == order_id,
+                ProdOrderFile.deleted_at.is_(None),
+                ProdOrderFile.kind.is_not(None),
+            )
+            .order_by(ProdOrderFile.created_at.desc(), ProdOrderFile.id.desc())
+        )
+    )
+    people = _people(db, [row.uploaded_by for row in rows])
+    return {
+        kind: [files.view(row, people) for row in rows if row.kind == kind]
+        for kind in ("pattern", "size_chart")
+    }
+
+
+def product_view(db: Session, order: ProdOrder) -> dict:
+    """The Product card: the details, who supplies it, its pattern files and
+    size charts. For anybody who reads Production; no money."""
+    found = _product_files(db, order.id)
+    return {
+        "colour_code": order.colour_code,
+        "fabric_type": order.fabric_type,
+        "decoration_type": order.decoration_type,
+        "decoration_width_cm": _width_text(order.decoration_width_cm),
+        "suppliers": product_suppliers(db, order),
+        "pattern_files": found["pattern"],
+        "size_charts": found["size_chart"],
+    }
+
+
 def view(db: Session, order_id: int, *, with_money: bool) -> dict:
     order = _order(db, order_id)
     facts = _facts(db, order)
@@ -1809,6 +1953,7 @@ def view(db: Session, order_id: int, *, with_money: bool) -> dict:
         ],
         "fix_not_returned": facts.fix_not_returned if facts.done("final_inspection") else None,
         "files_count": files_count,
+        "product": product_view(db, order),
         "warehouse_done_on": _day(warehouse.done_on),
         #: What the factory reported cutting, waiting for the QC manager
         #: (batch 6b): the Cutting stage shows it and the cut form opens with
@@ -1826,6 +1971,7 @@ def view(db: Session, order_id: int, *, with_money: bool) -> dict:
             db, order.id, facts.total("cut") if cut_done else facts.total("planned"),
             "cut" if cut_done else "planned",
         )
+        body["cost"]["cogs"] = cogs(facts)
         body["settlement"] = settlement(facts) if facts.done("cutting") else None
     return body
 
