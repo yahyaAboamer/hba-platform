@@ -280,6 +280,9 @@
 .prod-style__thumb {
   flex: none; display: block; width: 32px; height: 32px; border-radius: 6px; object-fit: cover; background: var(--rule);
 }
+/* A product photo sits on a light tile in both themes: the photos have see-through backgrounds,
+   and a black garment on the dark theme's tile could not be told apart from it. */
+img.prod-style__thumb { background: #ececea; object-fit: contain; padding: 2px; box-sizing: border-box; }
 .prod-style__list {
   position: absolute; z-index: 20; left: 0; right: 0; top: 100%; max-height: 320px; overflow-y: auto;
   margin: 4px 0 0; padding: 4px; list-style: none; border: 1px solid var(--rule-strong); border-radius: var(--radius);
