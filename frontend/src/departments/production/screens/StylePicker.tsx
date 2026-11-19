@@ -13,9 +13,25 @@ export function filterProducts<T extends { title: string }>(products: readonly T
   return products.filter((product) => product.title.toLocaleLowerCase().includes(wanted));
 }
 
+/**
+ * A Shopify image at thumbnail size. The product's own image is the full photo (often 4000 px), which
+ * makes a long list crawl; Shopify's CDN sends a small copy when asked for a width. Other addresses
+ * are left as they are.
+ */
+export function thumbUrl(url: string): string {
+  try {
+    const address = new URL(url);
+    if (address.hostname !== "cdn.shopify.com") return url;
+    address.searchParams.set("width", "96");
+    return address.toString();
+  } catch {
+    return url;
+  }
+}
+
 function Thumb({ url }: { url: string | null | undefined }) {
   return url ? (
-    <img className="prod-style__thumb" src={url} alt="" loading="lazy" />
+    <img className="prod-style__thumb" src={thumbUrl(url)} alt="" loading="lazy" />
   ) : (
     <span className="prod-style__thumb prod-style__thumb--none" aria-hidden="true" />
   );

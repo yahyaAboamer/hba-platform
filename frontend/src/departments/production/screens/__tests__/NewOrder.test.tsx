@@ -231,3 +231,12 @@ describe("The style picker", () => {
     expect((screen.getByLabelText("Style name") as HTMLInputElement).value).toBe("Boxy tee");
   });
 });
+
+describe("thumbUrl", () => {
+  it("asks Shopify's CDN for a small copy and leaves other addresses alone", async () => {
+    const { thumbUrl } = await import("../StylePicker");
+    expect(thumbUrl("https://cdn.shopify.com/s/files/1/x/files/A.png?v=17")).toBe("https://cdn.shopify.com/s/files/1/x/files/A.png?v=17&width=96");
+    expect(thumbUrl("https://example.com/a.png")).toBe("https://example.com/a.png");
+    expect(thumbUrl("not a url")).toBe("not a url");
+  });
+});
