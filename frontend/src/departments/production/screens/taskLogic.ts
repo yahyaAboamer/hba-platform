@@ -83,10 +83,15 @@ export function rangeProblem(range: Range): string | null {
 
 /** `/api/prod/tasks?view=open&from=…&to=…`: the bounds the person gave, nothing for an empty one. */
 export function tasksAddress(view: TaskView, range: Range): string {
+  return `/api/prod/tasks?${tasksQuery(view, range)}`;
+}
+
+/** `view=open&from=…&to=…`: the query part of `tasksAddress`. */
+export function tasksQuery(view: TaskView, range: Range): string {
   const query = new URLSearchParams({ view });
   if (range.from) query.set("from", range.from);
   if (range.to) query.set("to", range.to);
-  return `/api/prod/tasks?${query.toString()}`;
+  return query.toString();
 }
 
 /** What the empty list says on the Done tab, or on the Open tab with a date range. */

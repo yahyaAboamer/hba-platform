@@ -120,7 +120,7 @@ describe("The list", () => {
     expect(screen.getByRole("button", { name: "Last month" }).getAttribute("aria-pressed")).toBe("true");
 
     fireEvent.click(screen.getByRole("button", { name: "All" }));
-    await waitFor(() => expect(reads(calls).at(-1)).toBe("/api/prod/payments"));
+    await waitFor(() => expect(reads(calls).at(-1)).toBe("/api/prod/payments?"));
 
     fireEvent.change(screen.getByLabelText("Supplier"), { target: { value: "SUP-4" } });
     await waitFor(() => expect(reads(calls).at(-1)).toBe("/api/prod/payments?supplier=SUP-4"));

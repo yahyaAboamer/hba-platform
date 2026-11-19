@@ -51,13 +51,18 @@ export function payRangeProblem(range: PayRange): string | null {
   return range.from && range.to && range.from > range.to ? "The From date is after the To date." : null;
 }
 
-/** `/api/prod/payments?from=…&to=…&supplier=…`, leaving out what is not set. */
-export function paymentsAddress(range: PayRange, supplier: string): string {
+/** `from=…&to=…&supplier=…`, leaving out what is not set; empty when nothing is. */
+export function paymentsQuery(range: PayRange, supplier: string): string {
   const query = new URLSearchParams();
   if (range.from) query.set("from", range.from);
   if (range.to) query.set("to", range.to);
   if (supplier) query.set("supplier", supplier);
-  const text = query.toString();
+  return query.toString();
+}
+
+/** `/api/prod/payments?from=…&to=…&supplier=…`, leaving out what is not set. */
+export function paymentsAddress(range: PayRange, supplier: string): string {
+  const text = paymentsQuery(range, supplier);
   return text ? `/api/prod/payments?${text}` : "/api/prod/payments";
 }
 

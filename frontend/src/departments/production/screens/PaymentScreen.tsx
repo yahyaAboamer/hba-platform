@@ -11,7 +11,7 @@ import {
   PRESET_LABELS,
   PRESETS,
   payRangeProblem,
-  paymentsAddress,
+  paymentsQuery,
   paymentsSentence,
   presetOf,
   presetRange,
@@ -46,7 +46,7 @@ function Photos({ payment, actions }: { payment: PaymentRow; actions: PhotoActio
             return (
               <li key={photo.id} className="prod-thumb">
                 <a href={url} target="_blank" rel="noopener noreferrer" aria-label={`${label} (opens in a new tab)`}>
-                  {photo.mime_type.startsWith("image/") ? <img src={url} alt="" loading="lazy" /> : <span className="prod-thumb__file">PDF</span>}
+                  {photo.mime_type.startsWith("image/") ? <img src={`/api/prod/receipts/${photo.id}`} alt="" loading="lazy" /> : <span className="prod-thumb__file">PDF</span>}
                 </a>
                 {editable && (
                   <button
@@ -193,7 +193,7 @@ export function PaymentScreen({ session }: { session: Session }) {
   const load = useCallback(() => {
     const mine = ++latest.current;
     if (!isOwner || payRangeProblem(range)) return;
-    api.get<PaymentList>(paymentsAddress(range, supplier))
+    api.get<PaymentList>(`/api/prod/payments?${paymentsQuery(range, supplier)}`)
       .then((answer) => {
         if (latest.current !== mine) return;
         setData(answer);

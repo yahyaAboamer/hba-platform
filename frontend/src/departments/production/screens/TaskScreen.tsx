@@ -7,7 +7,7 @@ import { TaskForm } from "./TaskForm";
 import { deleteButtonId, NarrowRow, WideRow } from "./TaskRows";
 import type { RowActions } from "./TaskRows";
 import { TaskUpdateForm } from "./TaskUpdateForm";
-import { FILTER_LABELS, FILTERS, GROUP_LABELS, doneSentence, emptyWords, groupTasks, rangeProblem, summarySentence, tasksAddress } from "./taskLogic";
+import { FILTER_LABELS, FILTERS, GROUP_LABELS, doneSentence, emptyWords, groupTasks, rangeProblem, summarySentence, tasksQuery } from "./taskLogic";
 import type { Filter, Range } from "./taskLogic";
 import type { ManualTask, OrderRow, TaskList, TaskView } from "./types";
 import { DateBox, Problem, useIsNarrow } from "./ui";
@@ -60,7 +60,7 @@ export function TaskScreen({ session }: { session: Session }) {
     const mine = ++latest.current;
     // A range the wrong way round is said on the screen, and nothing is asked for.
     if (rangeProblem(range)) return;
-    api.get<TaskList>(tasksAddress(view, range))
+    api.get<TaskList>(`/api/prod/tasks?${tasksQuery(view, range)}`)
       .then((answer) => {
         if (latest.current !== mine) return;
         setData(answer);
