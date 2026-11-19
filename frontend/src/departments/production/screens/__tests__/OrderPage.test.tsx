@@ -457,7 +457,7 @@ describe("The inspection form", () => {
 describe("Editing the order", () => {
   const choices = {
     suppliers: [{ id: "SUP-2", name: "Print house A", category: "Printing houses" }],
-    products: [{ id: "P1", title: "Oversized hoodie" }],
+    products: [{ id: "P1", title: "Oversized hoodie", status: "active", image_url: null }],
     sizes: ["XS", "S", "M", "L", "XL", "XXL"],
     stage_days: {},
   };
@@ -756,7 +756,7 @@ describe("Cancelling after cutting says what goes on the factory's account", () 
 describe("The factory is read-only once cutting is done", () => {
   const choices = {
     suppliers: [{ id: "SUP-2", name: "Print house A", category: "Printing houses" }],
-    products: [{ id: "P1", title: "Oversized hoodie" }],
+    products: [{ id: "P1", title: "Oversized hoodie", status: "active", image_url: null }],
     sizes: ["XS", "S", "M", "L", "XL", "XXL"],
     stage_days: {},
   };

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { panelFromOpen } from "../logic";
 import type { Powers } from "../logic";
-import { detailLine, dueWords, groupTasks, matchesFilter, summarySentence, taskLink, waitingWords } from "../taskLogic";
+import { agoWords, detailLine, dueWords, emptyWords, groupTasks, matchesFilter, rangeProblem, summarySentence, taskLink, tasksAddress, updateLine, waitingWords } from "../taskLogic";
 import type { Delivery } from "../types";
 import { makeManual, makeOrder, makeTask, makeTaskList, TODAY } from "./fixtures";
 
@@ -47,12 +47,12 @@ describe("Filters and groups", () => {
 
 describe("The words on a row", () => {
   it("gives the date, and how many days when overdue", () => {
-    expect(dueWords(overdue)).toBe("10 Nov · 3 days");
-    expect(dueWords({ ...overdue, overdue_days: 1 })).toBe("10 Nov · 1 day");
-    expect(dueWords(today)).toBe("13 Nov");
-    expect(dueWords(makeManual({ id: 1, title: "x" }))).toBe("No date");
+    expect(dueWords(overdue)).toBe("Due 10 Nov · 3 days");
+    expect(dueWords({ ...overdue, overdue_days: 1 })).toBe("Due 10 Nov · 1 day");
+    expect(dueWords(today)).toBe("Due 13 Nov");
+    expect(dueWords(makeManual({ id: 1, title: "x" }))).toBe("No deadline");
     // The factory finishes making around its promised date.
-    expect(dueWords(later)).toBe("around 26 Nov");
+    expect(dueWords(later)).toBe("Due around 26 Nov");
     expect(dueWords(makeManual({ id: 2, title: "x", done: true, done_at: "2030-11-12T22:30:00Z", group: "done" }))).toBe("Done 13 Nov");
   });
 
@@ -181,5 +181,42 @@ describe("The form a task asks the order page to open", () => {
     for (const value of [null, "", "nonsense", "stage:plan", "stage:", "stage:cutting", "delivery-reason"]) {
       expect(panelFromOpen(value, makeOrder("cutting"), OWNER)).toBeNull();
     }
+  });
+});
+
+describe("The list's address and the date range", () => {
+  it("asks for the tab, and only the bounds that were given", () => {
+    expect(tasksAddress("open", { from: "", to: "" })).toBe("/api/prod/tasks?view=open");
+    expect(tasksAddress("done", { from: "2030-11-01", to: "" })).toBe("/api/prod/tasks?view=done&from=2030-11-01");
+    expect(tasksAddress("open", { from: "2030-11-01", to: "2030-11-30" })).toBe("/api/prod/tasks?view=open&from=2030-11-01&to=2030-11-30");
+  });
+
+  it("refuses a range the wrong way round, and nothing else", () => {
+    expect(rangeProblem({ from: "2030-11-20", to: "2030-11-01" })).toBe("The From date is after the To date.");
+    expect(rangeProblem({ from: "2030-11-01", to: "2030-11-01" })).toBeNull();
+    expect(rangeProblem({ from: "2030-11-20", to: "" })).toBeNull();
+  });
+
+  it("says why the list is empty, for the tab and the dates", () => {
+    expect(emptyWords("done", "all", { from: "", to: "" })).toBe("No tasks have been marked done yet.");
+    expect(emptyWords("done", "all", { from: "2030-11-01", to: "" })).toBe("No tasks were marked done in these dates.");
+    expect(emptyWords("open", "all", { from: "2030-11-01", to: "" })).toContain("Tasks with no deadline are left out");
+    expect(emptyWords("open", "owner", { from: "", to: "" })).toBe("Nothing is waiting on the owner.");
+  });
+});
+
+describe("Updates", () => {
+  const now = new Date("2030-11-13T12:00:00Z");
+  it("says how long ago, then the day", () => {
+    expect(agoWords("2030-11-13T11:59:40Z", now)).toBe("just now");
+    expect(agoWords("2030-11-13T11:55:00Z", now)).toBe("5 min ago");
+    expect(agoWords("2030-11-13T10:00:00Z", now)).toBe("2 h ago");
+    expect(agoWords("2030-11-11T10:00:00Z", now)).toBe("11 Nov");
+    expect(agoWords(null, now)).toBe("");
+  });
+
+  it("puts the latest update in one line", () => {
+    const update = { id: 1, text: "Fabric is at the cutter", next_action: null, created_at: "2030-11-13T10:00:00Z", created_by: "Nour" };
+    expect(updateLine(update, now)).toBe("Update · 2 h ago: Fabric is at the cutter");
   });
 });

@@ -742,18 +742,26 @@ def _payment_entry(db: Session, entry_id: int) -> ProdSupplierEntry:
     return entry
 
 
-def _live_receipt(db: Session, entry_id: int) -> ProdSupplierReceipt | None:
-    return db.scalar(
-        select(ProdSupplierReceipt).where(ProdSupplierReceipt.entry_id == entry_id, ProdSupplierReceipt.deleted_at.is_(None))
+def _live_receipts(db: Session, entry_id: int) -> list[ProdSupplierReceipt]:
+    """Every live photo of a payment, newest first (a payment may hold several)."""
+    return list(
+        db.scalars(
+            select(ProdSupplierReceipt)
+            .where(ProdSupplierReceipt.entry_id == entry_id, ProdSupplierReceipt.deleted_at.is_(None))
+            .order_by(ProdSupplierReceipt.created_at.desc(), ProdSupplierReceipt.id.desc())
+        )
     )
 
 
-def add_receipt(
-    db: Session, entry_id: int, *, content: bytes, actor: UserAccount
-) -> ProductionSupplier:
-    """Attach (or replace) the photo of a payment. Checked before anything is
-    stored; the bucket is written last, once the row is staged, so a refusal
-    never leaves a stored file behind. The replaced copy stays in the bucket."""
+def _live_receipt(db: Session, entry_id: int) -> ProdSupplierReceipt | None:
+    """The newest live photo of a payment."""
+    found = _live_receipts(db, entry_id)
+    return found[0] if found else None
+
+
+def _checked_photo(db: Session, entry_id: int, content: bytes) -> tuple[ProdSupplierEntry, ProductionSupplier, str]:
+    """The payment a photo goes on, its supplier (locked) and the photo's
+    type. Every check runs before anything is stored."""
     entry = _payment_entry(db, entry_id)
     supplier = _supplier(db, entry.supplier_id, for_update=True)
     if db.scalar(select(ProdSupplierEntry.id).where(ProdSupplierEntry.reverses_id == entry.id)) is not None:
@@ -765,34 +773,64 @@ def add_receipt(
     mime = file_type(content)
     if mime is None:
         raise Refused("Use a JPG, PNG, WebP or GIF photo, or a PDF.")
-    old = _live_receipt(db, entry.id)
-    if old is not None:
-        old.deleted_at = utcnow()
-        db.flush()
+    return entry, supplier, mime
+
+
+def _store_photo(
+    db: Session, entry: ProdSupplierEntry, supplier: ProductionSupplier, content: bytes, mime: str, actor: UserAccount
+) -> ProdSupplierReceipt:
+    """Stage the row; the bucket is written last, once the row is staged, so a
+    refusal never leaves a stored file behind."""
     key = f"production/suppliers/{supplier.id}/{uuid.uuid4()}"
-    db.add(
-        ProdSupplierReceipt(
-            entry_id=entry.id, storage_key=key, mime_type=mime, size_bytes=len(content), uploaded_by=actor.id
-        )
+    row = ProdSupplierReceipt(
+        entry_id=entry.id, storage_key=key, mime_type=mime, size_bytes=len(content), uploaded_by=actor.id
     )
+    db.add(row)
+    db.flush()
+    file_bucket().put(key, content, mime)
+    return row
+
+
+def add_receipt(
+    db: Session, entry_id: int, *, content: bytes, actor: UserAccount
+) -> ProductionSupplier:
+    """Attach the photo of a payment, **replacing every live one** (the old
+    single-receipt route). The replaced copies stay in the bucket."""
+    entry, supplier, mime = _checked_photo(db, entry_id, content)
+    old = _live_receipts(db, entry.id)
+    for row in old:
+        row.deleted_at = utcnow()
     db.flush()
     _audit(
         db, _subject(supplier), actor, "payment_receipt_added",
         f"{'Replaced' if old else 'Added'} the receipt photo of a payment to {supplier.name}", entry=entry.id,
     )
-    file_bucket().put(key, content, mime)
+    _store_photo(db, entry, supplier, content, mime, actor)
     return supplier
 
 
+def add_photo(db: Session, entry_id: int, *, content: bytes, actor: UserAccount) -> ProdSupplierEntry:
+    """One more photo (or PDF) of a payment, beside the ones it has."""
+    entry, supplier, mime = _checked_photo(db, entry_id, content)
+    _audit(
+        db, _subject(supplier), actor, "payment_receipt_added",
+        f"Added a photo of a payment to {supplier.name}", entry=entry.id,
+    )
+    _store_photo(db, entry, supplier, content, mime, actor)
+    return entry
+
+
 def remove_receipt(db: Session, entry_id: int, actor: UserAccount) -> ProductionSupplier:
+    """Take every live photo off a payment (the old single-receipt route)."""
     entry = db.get(ProdSupplierEntry, entry_id)
     if entry is None:
         raise NotFound("There is no such payment.")
     supplier = _supplier(db, entry.supplier_id, for_update=True)
-    receipt = _live_receipt(db, entry.id)
-    if receipt is None:
+    receipts = _live_receipts(db, entry.id)
+    if not receipts:
         raise NotFound("That payment has no receipt.")
-    receipt.deleted_at = utcnow()
+    for receipt in receipts:
+        receipt.deleted_at = utcnow()
     _audit(
         db, _subject(supplier), actor, "payment_receipt_removed",
         f"Removed the receipt photo of a payment to {supplier.name}", entry=entry.id,
@@ -800,8 +838,125 @@ def remove_receipt(db: Session, entry_id: int, actor: UserAccount) -> Production
     return supplier
 
 
+def remove_photo(db: Session, receipt_id: int, actor: UserAccount) -> ProdSupplierEntry:
+    """Take one photo off a payment; the others stay."""
+    receipt = db.get(ProdSupplierReceipt, receipt_id)
+    if receipt is None or receipt.deleted_at is not None:
+        raise NotFound("There is no such photo.")
+    entry = db.get(ProdSupplierEntry, receipt.entry_id)
+    supplier = _supplier(db, entry.supplier_id, for_update=True)
+    # Under the supplier's lock, look again: another removal may have committed.
+    db.refresh(receipt)
+    if receipt.deleted_at is not None:
+        raise NotFound("There is no such photo.")
+    receipt.deleted_at = utcnow()
+    _audit(
+        db, _subject(supplier), actor, "payment_receipt_removed",
+        f"Removed a photo of a payment to {supplier.name}", entry=entry.id,
+    )
+    return entry
+
+
 def receipt_for_download(db: Session, entry_id: int) -> ProdSupplierReceipt | None:
     return _live_receipt(db, entry_id)
+
+
+def photo_for_download(db: Session, receipt_id: int) -> ProdSupplierReceipt | None:
+    return db.scalar(
+        select(ProdSupplierReceipt).where(ProdSupplierReceipt.id == receipt_id, ProdSupplierReceipt.deleted_at.is_(None))
+    )
+
+
+# ── Payments, across every supplier (the owner's) ─────────────────────────────
+
+
+def _payment_rows(db: Session, entries: list[ProdSupplierEntry]) -> list[dict]:
+    ids = [e.id for e in entries]
+    if not ids:
+        return []
+    reversed_ids = set(
+        db.scalars(select(ProdSupplierEntry.reverses_id).where(ProdSupplierEntry.reverses_id.in_(ids)))
+    )
+    photos: dict[int, list[dict]] = {}
+    for r in db.scalars(
+        select(ProdSupplierReceipt)
+        .where(ProdSupplierReceipt.entry_id.in_(ids), ProdSupplierReceipt.deleted_at.is_(None))
+        .order_by(ProdSupplierReceipt.created_at, ProdSupplierReceipt.id)
+    ):
+        photos.setdefault(r.entry_id, []).append(
+            {
+                "id": r.id,
+                "mime_type": r.mime_type,
+                "size_bytes": r.size_bytes,
+                "created_at": _iso(r.created_at),
+                "url": f"/api/prod/receipts/{r.id}",
+            }
+        )
+    names = dict(
+        db.execute(
+            select(ProductionSupplier.id, ProductionSupplier.name).where(
+                ProductionSupplier.id.in_({e.supplier_id for e in entries})
+            )
+        ).all()
+    )
+    people = _people(db, [e.created_by for e in entries])
+    return [
+        {
+            "id": e.id,
+            "supplier": {"id": e.supplier_id, "name": names.get(e.supplier_id)},
+            # A payment line is negative on the account; the amount paid is positive.
+            "amount_piastres": -e.amount_piastres,
+            "paid_on": _day(e.happened_on),
+            "method": e.method,
+            "method_label": METHOD_LABELS.get(e.method, e.method),
+            "kind": e.payment_kind,
+            "kind_label": PAY_KIND_LABELS.get(e.payment_kind, e.payment_kind),
+            "note": e.note,
+            "reversed": e.id in reversed_ids,
+            "created_by": people.get(e.created_by),
+            "photos": photos.get(e.id, []),
+        }
+        for e in entries
+    ]
+
+
+def payment_row(db: Session, entry_id: int) -> dict:
+    entry = db.get(ProdSupplierEntry, entry_id)
+    if entry is None:
+        raise NotFound("There is no such payment.")
+    return _payment_rows(db, [entry])[0]
+
+
+def payments(
+    db: Session, *, start: date | None = None, end: date | None = None, supplier_id: str | None = None
+) -> dict:
+    """Every payment to every supplier, newest first, reversed ones marked
+    (their reversal lines are not listed), and the total of those not
+    reversed. ``start``/``end`` are inclusive, on the day it was paid.
+    **Money: the owner's alone.**"""
+    query = select(ProdSupplierEntry).where(
+        ProdSupplierEntry.kind == "payment", ProdSupplierEntry.reverses_id.is_(None)
+    )
+    if start is not None:
+        query = query.where(ProdSupplierEntry.happened_on >= start)
+    if end is not None:
+        query = query.where(ProdSupplierEntry.happened_on <= end)
+    if supplier_id:
+        query = query.where(ProdSupplierEntry.supplier_id == supplier_id)
+    entries = list(db.scalars(query.order_by(ProdSupplierEntry.happened_on.desc(), ProdSupplierEntry.id.desc())))
+    rows = _payment_rows(db, entries)
+    suppliers = db.execute(
+        select(ProductionSupplier.id, ProductionSupplier.name)
+        .where(ProductionSupplier.deleted_at.is_(None))
+        .order_by(ProductionSupplier.name)
+    ).all()
+    return {
+        "from": _day(start),
+        "to": _day(end),
+        "total_piastres": sum(row["amount_piastres"] for row in rows if not row["reversed"]),
+        "payments": rows,
+        "suppliers": [{"id": sid, "name": name} for sid, name in suppliers],
+    }
 
 
 # ── What is owed ──────────────────────────────────────────────────────────────
@@ -1108,7 +1263,10 @@ def _account_lines(db: Session, supplier_id: str, standing: Standing) -> list[di
     receipts = {
         r.entry_id: r
         for r in db.scalars(
-            select(ProdSupplierReceipt).where(ProdSupplierReceipt.entry_id.in_(ids), ProdSupplierReceipt.deleted_at.is_(None))
+            select(ProdSupplierReceipt)
+            .where(ProdSupplierReceipt.entry_id.in_(ids), ProdSupplierReceipt.deleted_at.is_(None))
+            # Oldest first, so the newest live photo is the one kept.
+            .order_by(ProdSupplierReceipt.created_at, ProdSupplierReceipt.id)
         )
     } if ids else {}
     items = dict(

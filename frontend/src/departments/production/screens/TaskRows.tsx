@@ -1,9 +1,9 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { WHO } from "./format";
+import { stamp, WHO } from "./format";
 import type { Powers } from "./logic";
-import { detailLine, dueWords, taskLink } from "./taskLogic";
+import { detailLine, dueWords, taskLink, updateLine } from "./taskLogic";
 import type { ManualTask, Task } from "./types";
 
 /** What a row can do to a hand-added task. */
@@ -11,6 +11,8 @@ export type RowActions = {
   onDone: (task: ManualTask) => void;
   onReopen: (task: ManualTask) => void;
   onEdit: (task: ManualTask, trigger: HTMLElement) => void;
+  /** Open the Update panel for this task. */
+  onUpdate: (task: ManualTask, trigger: HTMLElement) => void;
   onAskDelete: (task: ManualTask) => void;
   onKeep: (task: ManualTask) => void;
   onDelete: (task: ManualTask) => void;
@@ -79,6 +81,15 @@ function Buttons({ task, powers, busy, confirming, actions }: Omit<RowProps, "to
           Mark done
         </button>
       )}
+      <button
+        type="button"
+        className="button button--row"
+        disabled={busy}
+        onClick={(event) => actions.onUpdate(task, event.currentTarget)}
+        aria-label={`Update: ${task.title}`}
+      >
+        Update
+      </button>
       {openOrder}
       {!task.done && (
         <button
@@ -98,13 +109,53 @@ function Buttons({ task, powers, busy, confirming, actions }: Omit<RowProps, "to
   );
 }
 
+/** Every update on a task, newest first, behind a button that says how many there are. */
+function AllUpdates({ task }: { task: ManualTask }) {
+  const [shown, setShown] = useState(false);
+  const list = useId();
+  const count = task.updates.length;
+  if (count < 2) return null;
+  return (
+    <div className="prod-task__updates">
+      <button
+        type="button"
+        className="button button--quiet prod-task__more"
+        aria-expanded={shown}
+        aria-controls={list}
+        onClick={() => setShown(!shown)}
+      >
+        {shown ? "Hide updates" : `All updates (${count})`}
+        <span className="prod-sr"> for {task.title}</span>
+      </button>
+      {shown && (
+        <ol id={list} className="prod-history">
+          {task.updates.map((update) => (
+            <li key={update.id}>
+              {update.text}
+              {update.next_action && <div className="prod-small">Next action set to: {update.next_action}</div>}
+              <time dateTime={update.created_at ?? undefined}>
+                {update.created_by ? `${update.created_by} · ` : ""}
+                {stamp(update.created_at)}
+              </time>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 function Text({ task, today }: { task: Task; today: string }) {
   const detail = detailLine(task, today);
+  const latest = task.kind === "manual" ? task.updates[0] : undefined;
   return (
     <>
       <b>{task.title}</b>
+      {task.kind === "manual" && task.next_action && <div className="prod-task__next">Next: {task.next_action}</div>}
       {detail && <div className="prod-small">{detail}</div>}
+      {latest && <div className="prod-small prod-task__note">{updateLine(latest)}</div>}
       {task.kind === "manual" && task.note && <div className="prod-small prod-task__note">{task.note}</div>}
+      {task.kind === "manual" && <AllUpdates task={task} />}
     </>
   );
 }

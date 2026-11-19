@@ -218,7 +218,7 @@ def _all_the_way(client: TestClient) -> dict:
 #: rate, a value, a deduction, what is payable, or the settlement. ("settle"
 #: alone is not on the list: it is also the name of a stage, and the typical
 #: days of that stage are no money.)
-MONEY_WORDS = ("piastres", "cost", "rate", "settlement", "payable", "price", "value", "deduction", "held_")
+MONEY_WORDS = ("piastres", "cost", "rate", "settlement", "payable", "price", "value", "deduction", "held_", "cogs")
 
 
 def _no_money(payload, where: str = "") -> None:
@@ -886,7 +886,7 @@ def test_choices_lists_active_suppliers_and_products(owner, viewer):
         {"id": "fac", "name": "Main factory", "category": "Manufacturers"},
         {"id": "prt", "name": "Print house A", "category": "Printing houses"},
     ]
-    assert choices["products"] == [{"id": "111", "title": "Oversized hoodie"}]
+    assert choices["products"] == [{"id": "111", "title": "Oversized hoodie", "status": "active", "image_url": None}]
     assert choices["sizes"] == ["XS", "S", "M", "L", "XL", "XXL"]
     assert choices["stage_days"]["making"] == 17
 
@@ -1383,8 +1383,8 @@ def test_the_downgrade_refuses_while_an_order_exists(owner):
         command.downgrade(Config("alembic.ini"), "e5a2c7d90032")
     with engine.connect() as connection:
         # The whole downgrade is one transaction, so a refusal leaves the database at the head
-        # (`e5b9a3d70038`, then batch 6b's `d4a8f2c60037`, whose downgrades ran first and were rolled back with it).
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "e5b9a3d70038"
+        # (`f1c2d3e40039`, then `e5b9a3d70038` and batch 6b's `d4a8f2c60037`, whose downgrades ran first and were rolled back with it).
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "f1c2d3e40039"
         assert connection.execute(text("SELECT count(*) FROM prod_order")).scalar_one() == 1
 
 

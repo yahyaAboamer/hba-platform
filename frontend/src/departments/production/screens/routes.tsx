@@ -7,6 +7,7 @@ import { NewOrder } from "./NewOrder";
 import { OrderList } from "./OrderList";
 import { OrderPage } from "./OrderPage";
 import { OverviewScreen } from "./OverviewScreen";
+import { PaymentScreen } from "./PaymentScreen";
 import { ProductionLayout } from "./ProductionLayout";
 import { StageDays } from "./StageDays";
 import { SupplierPage } from "./SupplierPage";
@@ -19,7 +20,7 @@ import { TaskScreen } from "./TaskScreen";
  * tasks, samples and problems to Tasks, receiving to Incoming, suppliers to
  * Suppliers, and every other page (products, costs, reports, ...) to the
  * Overview. Bookmarks and emails keep working; nothing of the old app is left
- * to answer them. `suppliers`, `suppliers/:code` and `settings` exist here
+ * to answer them. `suppliers`, `suppliers/:code`, `payments` and `settings` exist here
  * too, so they are screens and not in this list.
  */
 export const OLD_PAGES: Readonly<Record<string, string>> = {
@@ -42,7 +43,6 @@ export const OLD_PAGES: Readonly<Record<string, string>> = {
   "route-templates": "overview",
   "quality-control": "overview",
   costs: "overview",
-  payments: "overview",
   reports: "overview",
   notifications: "overview",
   documents: "overview",
@@ -80,6 +80,7 @@ export function productionRoutes(session: Session) {
         <Route path="incoming" element={<IncomingScreen session={session} />} />
         <Route path="suppliers" element={<SupplierScreen session={session} />} />
         <Route path="suppliers/:id" element={<SupplierPage session={session} />} />
+        <Route path="payments" element={<PaymentScreen session={session} />} />
         <Route path="settings" element={<StageDays session={session} />} />
       </Route>
     </>

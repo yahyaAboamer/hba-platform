@@ -254,6 +254,71 @@
 .prod-halves .empty { margin: 0; }
 .prod-task.prod-task--plain { padding-left: 0; padding-right: 0; }
 
+/* ── The product card (order page) ── */
+.prod-product dd { white-space: normal; }
+.prod-swatch {
+  display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px;
+  border-radius: 3px; border: 1px solid var(--rule-strong);
+}
+.prod-filelist { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.prod-filelist a { overflow-wrap: anywhere; }
+.prod-filelist__add { margin-top: 6px; }
+
+/* ── Tasks: the Open / Done tabs, the date range, the next action and updates ── */
+.prod-tabs { margin-bottom: 10px; }
+.prod-range { align-items: end; }
+.prod-range .prod-field .input { width: auto; min-width: 160px; }
+.prod-task__next { margin-top: 2px; font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+.prod-task__updates { margin-top: 4px; }
+.prod-task__updates .prod-history { margin-top: 4px; font-size: 12.5px; }
+.prod-task__more { padding-left: 0; }
+
+/* ── The style picker (New order, Edit the order) ── */
+.prod-style { position: relative; }
+.prod-style__box { display: flex; align-items: center; gap: 8px; }
+.prod-style__box .input { flex: 1 1 auto; min-width: 0; }
+.prod-style__thumb {
+  flex: none; display: block; width: 32px; height: 32px; border-radius: 6px; object-fit: cover; background: var(--rule);
+}
+.prod-style__list {
+  position: absolute; z-index: 20; left: 0; right: 0; top: 100%; max-height: 320px; overflow-y: auto;
+  margin: 4px 0 0; padding: 4px; list-style: none; border: 1px solid var(--rule-strong); border-radius: var(--radius);
+  background: var(--surface);
+}
+.prod-style__list[hidden] { display: none; }
+.prod-style__option {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 8px; border-radius: 6px;
+  font-size: 14px; cursor: pointer;
+}
+.prod-style__option--active { background: var(--hover); outline: 1px solid var(--focus); }
+.prod-style__option--new { color: var(--quiet); border-top: 1px solid var(--rule); border-radius: 0; margin-top: 2px; }
+.prod-style__title { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.prod-style__draft { flex: none; }
+
+/* ── Payments ── */
+.prod-pay__table td { vertical-align: top; }
+.prod-pay__note { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 260px; }
+.prod-pay--reversed, .prod-pay--reversed td { color: var(--quiet); }
+.prod-pay__top { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; font-weight: 600; }
+.prod-pay__cards { margin: 0; padding: 0; list-style: none; }
+.prod-pay__photos { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.prod-pay__pickers { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.prod-pay__pick { position: relative; cursor: pointer; }
+.prod-pay__pick:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.prod-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.prod-thumb { position: relative; }
+.prod-thumb a { display: block; border-radius: 6px; }
+.prod-thumb a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.prod-thumb img, .prod-thumb__file {
+  display: grid; place-items: center; width: 48px; height: 48px; border-radius: 6px; object-fit: cover;
+  background: var(--rule); color: var(--quiet); font-size: 12px;
+}
+.prod-thumb__remove {
+  position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--rule-strong); background: var(--surface); color: var(--ink); font-size: 14px; line-height: 1; cursor: pointer;
+}
+.prod-thumb__remove:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
 /* ── Phone: one column; touch targets of 44px. ── */
 @media (max-width: 860px) {
   .prod-screen { padding-top: 16px; }
@@ -279,4 +344,9 @@
   .prod-task { padding: 14px 16px; }
   .prod-task--narrow .prod-rowlink { display: inline-flex; align-items: center; min-height: 44px; }
   .prod-nextbar .button { width: 100%; }
+  .prod-range .prod-field { flex: 1 1 140px; }
+  .prod-range .prod-field .input { width: 100%; min-width: 0; }
+  .prod-thumb img, .prod-thumb__file { width: 56px; height: 56px; }
+  .prod-thumb__remove { width: 32px; height: 32px; top: -10px; right: -10px; }
+  .prod-filelist a { display: inline-flex; align-items: center; min-height: 44px; }
 }

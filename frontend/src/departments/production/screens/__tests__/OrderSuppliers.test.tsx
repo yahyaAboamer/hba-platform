@@ -145,7 +145,8 @@ describe("The factory's name on the order page", () => {
     serve(makeOrder("cutting"));
     renderAt(ADDRESS, qc());
     await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
-    const link = screen.getByRole("link", { name: "Main factory" });
+    // The subtitle's link (the Product card links the factory too).
+    const link = screen.getAllByRole("link", { name: "Main factory" })[0];
     expect(link.getAttribute("href")).toBe("/production/suppliers/SUP-1");
     expect(link.closest(".page__subtitle")!.textContent).toContain("PO-2611-01 · Main factory · fabric bought by HBA · printed at the factory");
   });

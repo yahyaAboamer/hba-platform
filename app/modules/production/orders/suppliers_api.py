@@ -26,7 +26,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -451,3 +451,81 @@ def one_receipt(entry_id: int, actor: UserAccount = Depends(OWNER), db: Session 
 @router.delete("/entries/{entry_id}/receipt")
 def remove_receipt(entry_id: int, actor: UserAccount = Depends(OWNER), db: Session = Depends(get_session)) -> dict:
     return _write(db, actor, lambda: (suppliers.remove_receipt(db, entry_id, actor), None))
+
+
+# ── Payments, across every supplier (build plan 2026-11-19; the owner's alone) ─
+
+
+@router.get("/payments")
+def payment_list(
+    from_: date | None = Query(None, alias="from"),
+    to: date | None = Query(None),
+    supplier: str | None = Query(None, max_length=80),
+    actor: UserAccount = Depends(OWNER),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Every payment to every supplier, newest first, with its photos and the
+    total of those not reversed; ``from``/``to`` inclusive on the day paid."""
+    if from_ is not None and to is not None and from_ > to:
+        raise HTTPException(422, "The From date is after the To date. Swap them or clear one.")
+    return suppliers.payments(db, start=from_, end=to, supplier_id=(supplier or "").strip() or None)
+
+
+def _payment_write(db: Session, act) -> dict:
+    """Run one staged change to a payment's photos; commit and answer with the
+    payment as the list shows it, or roll back and refuse."""
+    try:
+        entry = act()
+    except NotFound as exc:
+        db.rollback()
+        raise HTTPException(404, str(exc)) from None
+    except Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    except StorageError:
+        db.rollback()
+        logger.exception("A supplier payment's photo could not be stored")
+        raise HTTPException(503, "The photo couldn't be saved. Try again.") from None
+    db.commit()
+    return {"payment": suppliers.payment_row(db, entry.id)}
+
+
+@router.post("/entries/{entry_id}/photos", status_code=201)
+async def add_payment_photo(
+    entry_id: int, request: Request, actor: UserAccount = Depends(OWNER), db: Session = Depends(get_session)
+) -> dict:
+    """One more photo or PDF of a payment, multipart: ``file``. The others stay.
+    Refused before reading when too large or of no stated size."""
+    if too_large(request):
+        raise HTTPException(413, "Files must be 20 MB or smaller.")
+    form = await request.form()
+    upload = form.get("file")
+    content = await upload.read() if hasattr(upload, "read") else b""
+    return await run_in_threadpool(
+        lambda: _payment_write(db, lambda: suppliers.add_photo(db, entry_id, content=content, actor=actor))
+    )
+
+
+@router.get("/receipts/{receipt_id}")
+def one_payment_photo(
+    receipt_id: int, actor: UserAccount = Depends(OWNER), db: Session = Depends(get_session)
+) -> Response:
+    row = suppliers.photo_for_download(db, receipt_id)
+    if row is None:
+        raise HTTPException(404, "There is no such photo.")
+    try:
+        content = file_bucket().get(row.storage_key)
+    except StorageError:
+        raise HTTPException(404, "There is no such photo.") from None
+    return Response(
+        content,
+        media_type=row.mime_type,
+        headers={"Content-Disposition": "inline", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@router.delete("/receipts/{receipt_id}")
+def remove_payment_photo(
+    receipt_id: int, actor: UserAccount = Depends(OWNER), db: Session = Depends(get_session)
+) -> dict:
+    return _payment_write(db, lambda: suppliers.remove_photo(db, receipt_id, actor))

@@ -86,6 +86,8 @@ DEFAULT_STAGE_DAYS: dict[str, int] = {
 COST_PARTS: tuple[str, ...] = ("fabric", "manufacturing", "printing", "accessories", "packaging")
 
 FABRIC_BUYERS = ("hba", "factory")
+#: What a file on an order is, when it is one of the product's own: its pattern or its size chart.
+FILE_KINDS = ("pattern", "size_chart")
 PRINTING = ("factory", "outside", "none")
 SAMPLE_STATUSES = ("none", "pending", "approved", "changes")
 ORDER_STATUSES = ("open", "closed", "cancelled")
@@ -147,6 +149,10 @@ class ProdOrder(Base):
             "(settled_at IS NULL) = (settled_payable_piastres IS NULL)", name="prod_order_settlement_whole"
         ),
         CheckConstraint("status <> 'closed' OR settled_at IS NOT NULL", name="prod_order_closed_is_settled"),
+        CheckConstraint(
+            "decoration_width_cm IS NULL OR (decoration_width_cm > 0 AND decoration_width_cm <= 999.9)",
+            name="prod_order_decoration_width_range",
+        ),
         Index("ix_prod_order_status", "status"),
     )
 
@@ -191,6 +197,15 @@ class ProdOrder(Base):
     settled_by: Mapped[int | None] = _user()
 
     notes: Mapped[str | None] = mapped_column(Text)
+
+    #: The product's details (build plan 2026-11-19): a colour code such as
+    #: ``Pantone 19-0303`` or ``#2F3A2F``, the fabric, the print / embroidery
+    #: type and its width in cm. No money.
+    colour_code: Mapped[str | None] = mapped_column(String(40))
+    fabric_type: Mapped[str | None] = mapped_column(String(120))
+    decoration_type: Mapped[str | None] = mapped_column(String(120))
+    decoration_width_cm: Mapped[Decimal | None] = mapped_column(Numeric(6, 1))
+
     created_by: Mapped[int | None] = _user()
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _created()
@@ -324,12 +339,15 @@ class ProdOrderFile(Base):
     __table_args__ = (
         CheckConstraint(f"stage IS NULL OR stage IN ({_in(STAGES)})", name="prod_order_file_stage_valid"),
         CheckConstraint("size_bytes >= 0", name="prod_order_file_size_not_negative"),
+        CheckConstraint(f"kind IS NULL OR kind IN ({_in(FILE_KINDS)})", name="prod_order_file_kind_valid"),
         Index("ix_prod_order_file_order", "order_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     order_id: Mapped[int] = mapped_column(Integer, ForeignKey("prod_order.id"), nullable=False)
     stage: Mapped[str | None] = mapped_column(String(20))
+    #: ``pattern`` or ``size_chart``, or none for any other file.
+    kind: Mapped[str | None] = mapped_column(String(12))
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(300), nullable=False)
     mime_type: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -352,6 +370,9 @@ class ProdTask(Base):
     __tablename__ = "prod_task"
     __table_args__ = (
         CheckConstraint("char_length(title) BETWEEN 1 AND 200", name="prod_task_title_length"),
+        CheckConstraint(
+            "next_action IS NULL OR char_length(next_action) BETWEEN 1 AND 500", name="prod_task_next_action_length"
+        ),
         Index("ix_prod_task_order", "order_id"),
     )
 
@@ -361,6 +382,8 @@ class ProdTask(Base):
     #: The order it hangs on, if any.
     order_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("prod_order.id"))
     note: Mapped[str | None] = mapped_column(Text)
+    #: What is to be done next on it (build plan 2026-11-19).
+    next_action: Mapped[str | None] = mapped_column(Text)
     #: Whose list it is on: the owner's when true, else the QC manager's.
     for_owner: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -368,6 +391,28 @@ class ProdTask(Base):
     created_by: Mapped[int | None] = _user()
     created_at: Mapped[datetime] = _created()
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProdTaskUpdate(Base):
+    """One follow-up line on a hand-added task: what happened, and what the
+    next action was set to by it, if it changed it. **Never edited.** No money."""
+
+    __tablename__ = "prod_task_update"
+    __table_args__ = (
+        CheckConstraint("char_length(text) BETWEEN 1 AND 2000", name="prod_task_update_text_length"),
+        CheckConstraint(
+            "next_action IS NULL OR char_length(next_action) BETWEEN 1 AND 500",
+            name="prod_task_update_next_action_length",
+        ),
+        Index("ix_prod_task_update_task", "task_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_id: Mapped[int] = mapped_column(Integer, ForeignKey("prod_task.id"), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    next_action: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()
 
 
 # ── Suppliers (batch 4; build plan 2026-11-14-production-suppliers-build.md) ──
@@ -495,16 +540,14 @@ class ProdSupplierEntry(Base):
 
 
 class ProdSupplierReceipt(Base):
-    """An optional photo of a payment, in the file bucket under
-    ``production/suppliers/{supplier_id}/``. Replaced or removed with
-    ``deleted_at``; at most one is live per payment."""
+    """A photo (or PDF) of a payment, in the file bucket under
+    ``production/suppliers/{supplier_id}/``. A payment may hold several
+    (build plan 2026-11-19); each is removed with ``deleted_at``."""
 
     __tablename__ = "prod_supplier_receipt"
     __table_args__ = (
         CheckConstraint("size_bytes >= 0", name="prod_supplier_receipt_size_not_negative"),
-        Index(
-            "uq_prod_supplier_receipt_live", "entry_id", unique=True, postgresql_where=text("deleted_at IS NULL")
-        ),
+        Index("ix_prod_supplier_receipt_entry", "entry_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

@@ -6,7 +6,7 @@ import type { ManualTask, TaskAnswer, TaskOrder } from "./types";
 import { Actions, DateBox, PanelShell, TextBox } from "./ui";
 
 /** What the server sends for a hand-added task (`NewTask`, `TaskEdit`). */
-type Body = { title: string; due_on: string | null; order_id: number | null; note: string | null; for_owner: boolean };
+type Body = { title: string; due_on: string | null; order_id: number | null; note: string | null; next_action: string | null; for_owner: boolean };
 
 /**
  * Add a task by hand, or change one (`task`). The server checks every rule again: this only says the
@@ -29,6 +29,7 @@ export function TaskForm({
   const [due, setDue] = useState(task?.due ?? "");
   const [orderId, setOrderId] = useState(task?.order ? String(task.order.id) : "");
   const [note, setNote] = useState(task?.note ?? "");
+  const [next, setNext] = useState(task?.next_action ?? "");
   const [forOwner, setForOwner] = useState(task?.for_owner ?? false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -48,6 +49,7 @@ export function TaskForm({
       due_on: due || null,
       order_id: orderId ? Number(orderId) : null,
       note: note.trim() || null,
+      next_action: next.trim() || null,
       for_owner: forOwner,
     };
     setError(null);
@@ -67,7 +69,7 @@ export function TaskForm({
     <PanelShell title={task ? "Edit task" : "Add task"} onClose={onClose}>
       <form className="prod-form" onSubmit={save} noValidate>
         <TextBox label="Task" value={title} onChange={setTitle} max={200} wide />
-        <DateBox label="Date (optional)" value={due} onChange={setDue} />
+        <DateBox label="Deadline (optional)" value={due} onChange={setDue} />
         <div className="prod-field">
           <label className="field__label" htmlFor={`${id}-order`}>
             Order (optional)
@@ -81,6 +83,7 @@ export function TaskForm({
             ))}
           </select>
         </div>
+        <TextBox label="Next action (optional)" value={next} onChange={setNext} max={500} wide />
         <TextBox label="Note (optional)" value={note} onChange={setNote} area max={2000} wide />
         <label className="prod-check prod-wide">
           <input type="checkbox" checked={forOwner} onChange={(event) => setForOwner(event.target.checked)} />
