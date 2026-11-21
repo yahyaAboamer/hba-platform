@@ -26,6 +26,7 @@ from sqlalchemy import select, text  # noqa: E402
 
 from app.db import SessionLocal, engine  # noqa: E402
 from app.modules.inbox.models import (  # noqa: E402
+    FeedbackFollowUp,
     FeedbackSettings,
     FeedbackSurvey,
     InboxConversation,
@@ -112,7 +113,18 @@ def main() -> None:
             comment_at=asked + timedelta(minutes=8) if comment else None,
         )
         values.update(fields)
-        db.add(FeedbackSurvey(**values))
+        survey = FeedbackSurvey(**values)
+        db.add(survey)
+        db.flush()
+        return survey
+
+    def log(survey, *entries):
+        """Follow-up history (ADR 0087): ``(kind, hours_ago, who, note)`` each."""
+        for kind, hours_ago, who, note in entries:
+            db.add(FeedbackFollowUp(
+                survey_id=survey.id, round=survey.follow_up_round, kind=kind, note=note,
+                actor_id=who, at=ago(hours=hours_ago),
+            ))
         db.flush()
 
     # Loved
@@ -139,21 +151,39 @@ def main() -> None:
          code="FB-D7G2JE", code_sent_at=ago(days=8), code_expires_at=ago(days=-22))
     make(12, name="Mona", rating="okay", reason="quality", step="done", courier="Mylerz")
     # Unhappy, waiting for a person
-    make(1, name="Yara", rating="unhappy", reason="size_fit", step="support", comment="The size chart is wrong.",
-         courier="Bosta", products=("Linen Shirt",), last="Our team will reply within 24 hours.")
-    make(2, hours=4, name="Mariam K.", rating="unhappy", reason="wrong_item", step="support", comment=LONG_COMMENT,
-         courier="Aramex", products=("Wide Trousers", "Cotton Tee"), last="Our team will reply within 24 hours.")
+    yara = make(1, name="Yara", rating="unhappy", reason="size_fit", step="support", comment="The size chart is wrong.",
+                courier="Bosta", products=("Linen Shirt",), last="Our team will reply within 24 hours.")
+    # Two calls nobody answered, and the platform's message after the second.
+    log(yara, ("no_answer", 20, mariam, None), ("no_answer", 3, mariam, "Phone switched off."),
+        ("message_sent", 3, None, "We tried to call you about your order #31011. Reply here or tell us a good time to call."))
+    mariam_k = make(2, hours=4, name="Mariam K.", rating="unhappy", reason="wrong_item", step="support",
+                    comment=LONG_COMMENT, courier="Aramex", products=("Wide Trousers", "Cotton Tee"),
+                    last="Our team will reply within 24 hours.")
+    log(mariam_k, ("note", 30, owner, "Spoke to her. She wants the right trousers, checking stock first."))
     make(9, name="هبة محمود", rating="unhappy", reason="delivery", step="support", comment=ARABIC_LONG,
          courier="Mylerz", products=("قميص كتان",), last="Our team will reply within 24 hours.")
+    # One call with no answer; the message could not be sent.
+    fatma = make(0, hours=5, name="Fatma", rating="unhappy", reason="quality", step="support",
+                 comment="The colour is not like the picture.", courier="Bosta", products=("Silk Scarf",),
+                 last="Our team will reply within 24 hours.")
+    log(fatma, ("no_answer", 2, mariam, "تليفونها مقفول، هحاول تاني بالليل"))
+    # Three calls, closed as couldn't reach.
+    nadia = make(6, name="Nadia", rating="unhappy", reason="delivery", step="done", comment="Waited a week.",
+                 courier="Aramex", products=("Linen Shirt",), unreached_at=ago(days=3), unreached_by=mariam,
+                 last="We tried to call you about your order.")
+    log(nadia, ("no_answer", 130, mariam, None), ("no_answer", 110, mariam, None),
+        ("message_sent", 110, None, "We tried to call you about your order. Reply here or tell us a good time to call."),
+        ("no_answer", 72, mariam, "No answer again."), ("unreached", 72, mariam, None))
     # Reopened: she said No, and the later question could not be sent
     make(7, name="Aya", rating="unhappy", reason="quality", step="support", comment="Stitching came apart.",
          courier="Bosta", products=("Wrap Dress",), reopened_count=1, solved=False, solved_at=ago(days=1),
          resolved_at=None, last_error='The question "Was your issue solved?" could not be sent: '
          'WhatsApp is not connected on this server.', last="Our team will reply within 24 hours.")
     # Resolved, waiting for her answer
-    make(4, name="Nada", rating="unhappy", reason="quality", step="solved", comment="Button fell off.",
-         courier="Aramex", products=("Linen Shirt",), resolved_at=ago(days=3), resolved_by=mariam,
-         last="Our team will reply within 24 hours.")
+    nada = make(4, name="Nada", rating="unhappy", reason="quality", step="solved", comment="Button fell off.",
+                courier="Aramex", products=("Linen Shirt",), resolved_at=ago(days=3), resolved_by=mariam,
+                last="Our team will reply within 24 hours.")
+    log(nada, ("resolved", 72, mariam, "Sending a new shirt; the courier collects the old one Monday."))
     # Solved yes, reorder answered, code used
     make(14, name="Sara", rating="unhappy", reason="delivery", step="done", comment="Late by a week.",
          courier="Mylerz", products=("Silk Scarf",), resolved_at=ago(days=12), resolved_by=owner,

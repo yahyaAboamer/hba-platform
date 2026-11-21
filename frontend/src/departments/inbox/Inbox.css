@@ -356,7 +356,13 @@ button.inbox-fb__tile--owed:hover { box-shadow:inset 0 0 0 1px var(--owed); }
 
 /* Under 860px the cards and the waiting list stack. */
 @media (max-width:860px) {
-  .ops-tiles.inbox-fb__tiles { grid-template-columns:minmax(0,1fr); gap:10px; }
+  /* Answered and To follow up side by side, the bar and the codes each across
+     the row, so the people to call are not four screens down on a phone.
+     Dense: the follow-up card fills the gap beside Answered. */
+  .ops-tiles.inbox-fb__tiles { grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-auto-flow:row dense; gap:10px; }
+  .inbox-fb__tile--felt, .inbox-fb__tile--codes { grid-column:1 / -1; }
+  .inbox-fb__tile { padding:12px 14px 10px; }
+  .inbox-fb__tile .ops-tile__value { font-size:24px; }
   .inbox-fbq__card { grid-template-columns:minmax(0,1fr); gap:10px; }
   .inbox-fbq__acts { flex-direction:row; flex-wrap:wrap; min-width:0; }
   .inbox-fbq__acts .inbox-btn { flex:1 1 auto; }

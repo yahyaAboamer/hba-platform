@@ -244,7 +244,7 @@ function Cards({
         <div className={`ops-tile inbox-fb__tile inbox-fb__tile--static${owed}`}>{followUpBody}</div>
       )}
 
-      <div className="ops-tile inbox-fb__tile">
+      <div className="ops-tile inbox-fb__tile inbox-fb__tile--codes">
         <span className="ops-tile__label">Reward codes used</span>
         <span className="ops-tile__value">
           {count(summary.codes_used)}
