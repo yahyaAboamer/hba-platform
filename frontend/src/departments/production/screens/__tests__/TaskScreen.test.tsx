@@ -161,6 +161,7 @@ describe("Searching tasks", () => {
 
     fireEvent.change(box, { target: { value: "pantone" } });
     expect(titles()).toEqual(["Visit the new print house"]);
+    expect(screen.getByText("1 open task matches.")).toBeTruthy();
     fireEvent.change(box, { target: { value: "open at ten" } });
     expect(titles()).toEqual(["Visit the new print house"]);
 
