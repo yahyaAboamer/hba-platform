@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import type { ReactNode } from "react";
 
 import { stepsSentence } from "./format";
+import { thumbUrl } from "./StylePicker";
 import type { Counts, ReasonRow } from "./logic";
 import { blankReason, totalOf } from "./logic";
 import type { OrderAnswer, OrderRow, Size } from "./types";
@@ -34,6 +35,43 @@ export function Problem({ children }: { children: ReactNode }) {
     <p className="notice notice--refused prod-problem" role="alert">
       {children}
     </p>
+  );
+}
+
+/**
+ * The style's photo at the start of an order's row, so the list reads at a glance (the owner,
+ * 21 November 2026). On the same light tile as the style picker; an order with no photo gets an
+ * empty tile, so the rows stay lined up.
+ */
+export function StylePhoto({ url }: { url: string | null | undefined }) {
+  return url ? (
+    <img className="prod-photo" src={thumbUrl(url)} alt="" loading="lazy" />
+  ) : (
+    <span className="prod-photo prod-photo--none" aria-hidden="true" />
+  );
+}
+
+/**
+ * A search box for a list. `hint` says what it looks through, in small words under the box: a
+ * placeholder that long is cut off on a phone, and the owner wants to know what typing can find.
+ */
+export function SearchBox({ label, hint, value, onChange }: {
+  label: string; hint: string; value: string; onChange: (value: string) => void;
+}) {
+  const hintId = useId();
+  return (
+    <div className="prod-search">
+      <input
+        type="search"
+        className="input"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={label}
+        aria-label={label}
+        aria-describedby={hintId}
+      />
+      <p id={hintId} className="prod-small prod-search__hint">Finds: {hint}</p>
+    </div>
   );
 }
 

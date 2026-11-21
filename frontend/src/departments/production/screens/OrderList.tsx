@@ -5,8 +5,9 @@ import { api, can } from "../../../lib/api";
 import type { Session } from "../../../lib/api";
 import { cairoToday, lateWords, pieces, shortDay, stagePhrase, whoWhen } from "./format";
 import type { Tone } from "./format";
+import { ORDER_SEARCH_HINT, orderMatches } from "./search";
 import type { OrderRow } from "./types";
-import { Problem, Steps, useIsNarrow } from "./ui";
+import { Problem, SearchBox, Steps, StylePhoto, useIsNarrow } from "./ui";
 
 type OrderRows = { orders: OrderRow[] };
 type Filter = "open" | "late" | "waiting" | "closed";
@@ -59,8 +60,13 @@ function Table({ rows, today }: { rows: OrderRow[]; today: string }) {
           {rows.map((row) => (
             <tr key={row.id}>
               <td>
-                <OrderName row={row} />
-                <div className="prod-small">{row.code}</div>
+                <div className="prod-with-photo">
+                  <StylePhoto url={row.image_url} />
+                  <div>
+                    <OrderName row={row} />
+                    <div className="prod-small">{row.code}</div>
+                  </div>
+                </div>
               </td>
               <td>{row.factory.name ?? "—"}</td>
               <td>
@@ -91,10 +97,13 @@ function Cards({ rows, today }: { rows: OrderRow[]; today: string }) {
     <div className="prod-cards">
       {rows.map((row) => (
         <article key={row.id} className="prod-card">
-          <div>
-            <OrderName row={row} />
-            <div className="prod-small">
-              {row.code} · {row.factory.name ?? "—"}
+          <div className="prod-with-photo">
+            <StylePhoto url={row.image_url} />
+            <div>
+              <OrderName row={row} />
+              <div className="prod-small">
+                {row.code} · {row.factory.name ?? "—"}
+              </div>
             </div>
           </div>
           <div>
@@ -122,6 +131,7 @@ export function OrderList({ session }: { session: Session }) {
   const [closed, setClosed] = useState<OrderRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("open");
+  const [query, setQuery] = useState("");
   const narrow = useIsNarrow();
   const isOwner = can(session, "production.owner");
   const today = useMemo(cairoToday, []);
@@ -140,7 +150,13 @@ export function OrderList({ session }: { session: Session }) {
   const late = open?.filter((row) => row.flags.late) ?? [];
   const waiting = open?.filter((row) => row.flags.waiting_for_owner) ?? [];
   const attention = open?.filter(needsAttention).length ?? 0;
-  const shown = filter === "open" ? open : filter === "late" ? late : filter === "waiting" ? waiting : closed;
+  // A search looks through every order, in production and closed, whichever chip is on.
+  const searching = query.trim() !== "";
+  const found = useMemo(
+    () => (searching ? [...(open ?? []), ...(closed ?? [])].filter((row) => orderMatches(row, query)) : []),
+    [searching, open, closed, query],
+  );
+  const shown = searching ? found : filter === "open" ? open : filter === "late" ? late : filter === "waiting" ? waiting : closed;
 
   const chips: { key: Filter; label: string; count: number }[] = [
     { key: "open", label: "In production", count: open?.length ?? 0 },
@@ -187,21 +203,33 @@ export function OrderList({ session }: { session: Session }) {
 
       {!error && open !== null && closed !== null && (
         <>
+          <SearchBox label="Search orders" hint={ORDER_SEARCH_HINT} value={query} onChange={setQuery} />
           <div className="prod-chips" role="group" aria-label="Show">
             {chips.map((chip) => (
               <button
                 key={chip.key}
                 type="button"
-                className={`chip${filter === chip.key ? " chip--on" : ""}`}
-                aria-pressed={filter === chip.key}
-                onClick={() => setFilter(chip.key)}
+                className={`chip${!searching && filter === chip.key ? " chip--on" : ""}`}
+                aria-pressed={!searching && filter === chip.key}
+                onClick={() => {
+                  setQuery("");
+                  setFilter(chip.key);
+                }}
               >
                 {chip.label} · {chip.count}
               </button>
             ))}
           </div>
 
-          {shown && shown.length === 0 ? (
+          {searching && (
+            <p className="prod-small" role="status">
+              {found.length === 0
+                ? "No order matches. The search looks through open and closed orders."
+                : `${found.length} order${found.length === 1 ? "" : "s"} match, open and closed.`}
+            </p>
+          )}
+
+          {searching && found.length === 0 ? null : shown && shown.length === 0 ? (
             <p className="empty">
               {empty[filter]}
               {filter === "open" && isOwner && (

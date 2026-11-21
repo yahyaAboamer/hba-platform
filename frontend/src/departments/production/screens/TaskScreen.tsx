@@ -9,8 +9,9 @@ import type { RowActions } from "./TaskRows";
 import { TaskUpdateForm } from "./TaskUpdateForm";
 import { FILTER_LABELS, FILTERS, GROUP_LABELS, doneSentence, emptyWords, groupTasks, rangeProblem, summarySentence, tasksQuery } from "./taskLogic";
 import type { Filter, Range } from "./taskLogic";
+import { TASK_SEARCH_HINT, taskMatches } from "./search";
 import type { ManualTask, OrderRow, TaskList, TaskView } from "./types";
-import { DateBox, Problem, useIsNarrow } from "./ui";
+import { DateBox, Problem, SearchBox, useIsNarrow } from "./ui";
 
 /** The form is open for a new task (`task: null`), for one being changed, or for an update to one. */
 type FormState = { task: ManualTask | null; update?: boolean };
@@ -31,6 +32,7 @@ export function TaskScreen({ session }: { session: Session }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [view, setView] = useState<TaskView>("open");
   const [range, setRange] = useState<Range>(NO_RANGE);
+  const [query, setQuery] = useState("");
   // How many each tab holds, for the date range it was read with. The Done tab's number is known only once
   // that tab has been read (it is read when opened, not before), so until then it says "Done" alone.
   const [tabCounts, setTabCounts] = useState<Partial<Record<TaskView, { key: string; count: number }>>>({});
@@ -161,8 +163,11 @@ export function TaskScreen({ session }: { session: Session }) {
   }
 
   const Row = narrow ? NarrowRow : WideRow;
-  const shownFilter: Filter = view === "open" ? filter : "all";
-  const groups = data ? groupTasks(data.tasks, shownFilter) : [];
+  // A search looks through every task of the tab that is open, whichever chip is on.
+  const searching = query.trim() !== "";
+  const shownFilter: Filter = view === "open" && !searching ? filter : "all";
+  const found = data ? (searching ? data.tasks.filter((task) => taskMatches(task, query)) : data.tasks) : [];
+  const groups = data ? groupTasks(found, shownFilter) : [];
   const key = rangeKey(range);
   const tabWords = (tab: TaskView): string => {
     const known = tabCounts[tab];
@@ -247,15 +252,19 @@ export function TaskScreen({ session }: { session: Session }) {
 
       {data && !wrongWay && (
         <>
+          <SearchBox label="Search tasks" hint={TASK_SEARCH_HINT} value={query} onChange={setQuery} />
           {view === "open" && (
           <div className="prod-chips" role="group" aria-label="Show">
             {FILTERS.map((key) => (
               <button
                 key={key}
                 type="button"
-                className={`chip${filter === key ? " chip--on" : ""}`}
-                aria-pressed={filter === key}
-                onClick={() => setFilter(key)}
+                className={`chip${!searching && filter === key ? " chip--on" : ""}`}
+                aria-pressed={!searching && filter === key}
+                onClick={() => {
+                  setQuery("");
+                  setFilter(key);
+                }}
               >
                 {FILTER_LABELS[key]} · {data.counts[key]}
               </button>
@@ -263,7 +272,15 @@ export function TaskScreen({ session }: { session: Session }) {
           </div>
           )}
 
-          {groups.length === 0 ? (
+          {searching && (
+            <p className="prod-small" role="status">
+              {found.length === 0
+                ? `No ${view === "open" ? "open" : "done"} task matches.`
+                : `${found.length} ${view === "open" ? "open" : "done"} task${found.length === 1 ? "" : "s"} match.`}
+            </p>
+          )}
+
+          {searching && found.length === 0 ? null : groups.length === 0 ? (
             <p className="empty">{emptyWords(view, shownFilter, range)}</p>
           ) : (
             groups.map(({ group, tasks }) => (

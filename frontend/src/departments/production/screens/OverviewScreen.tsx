@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { Pager } from "../../../components/Pager";
 import { api, can } from "../../../lib/api";
 import type { Session } from "../../../lib/api";
 import { formatEgp } from "../../../lib/money";
@@ -20,8 +21,12 @@ import {
   orderLine,
   problemLabel,
 } from "./overviewLogic";
+import { byUrgency } from "./search";
 import type { IncomingArrival, OrderRow, Overview, OverviewDecision, OverviewOwed, OverviewProblem } from "./types";
-import { Problem, Steps, useIsNarrow } from "./ui";
+import { Problem, Steps, StylePhoto, useIsNarrow } from "./ui";
+
+/** How many orders the Overview shows at a time: five, unless the owner asks for more (21 November 2026). */
+const ORDER_PAGE_SIZES = [5, 10, 25, 50];
 
 /** One row's frame: the text, then what sits beside it on a wide screen or below it on a phone. */
 function Row({ narrow, plain, what, side }: { narrow: boolean; plain?: boolean; what: ReactNode; side: ReactNode }) {
@@ -99,13 +104,16 @@ function OrderRowView({ row, narrow }: { row: OrderRow; narrow: boolean }) {
     <Row
       narrow={narrow}
       what={
-        <>
-          <Link className="prod-rowlink" to={orderAddress(row.id)}>
-            {row.style_name} · {row.colour}
-          </Link>
-          <div className="prod-small">{orderLine(row)}</div>
-          <Steps steps={row.steps} />
-        </>
+        <div className="prod-with-photo">
+          <StylePhoto url={row.image_url} />
+          <div>
+            <Link className="prod-rowlink" to={orderAddress(row.id)}>
+              {row.style_name} · {row.colour}
+            </Link>
+            <div className="prod-small">{orderLine(row)}</div>
+            <Steps steps={row.steps} />
+          </div>
+        </div>
       }
       side={
         <>
@@ -167,6 +175,8 @@ export function OverviewScreen({ session }: { session: Session }) {
   const narrow = useIsNarrow();
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(ORDER_PAGE_SIZES[0]);
   // Which answer is the newest: an answer that an earlier request delivers late, or one for a screen
   // that has been left, is dropped.
   const latest = useRef(0);
@@ -197,6 +207,11 @@ export function OverviewScreen({ session }: { session: Session }) {
     </Link>
   );
   const figures = data ? figuresOf(data, isOwner) : [];
+  const ordered = useMemo(() => (data ? byUrgency(data.orders) : []), [data]);
+  // A reload with fewer orders may leave the page past the end: the last page is shown instead.
+  const lastPage = Math.max(0, Math.ceil(ordered.length / pageSize) - 1);
+  const shownPage = Math.min(page, lastPage);
+  const pageRows = ordered.slice(shownPage * pageSize, (shownPage + 1) * pageSize);
 
   return (
     <>
@@ -263,11 +278,26 @@ export function OverviewScreen({ session }: { session: Session }) {
                 {isOwner && <div className="prod-head-actions">{newOrder}</div>}
               </div>
             ) : (
-              <ul className="surface prod-tasks">
-                {data.orders.map((row) => (
-                  <OrderRowView key={row.id} row={row} narrow={narrow} />
-                ))}
-              </ul>
+              <>
+                <ul className="surface prod-tasks">
+                  {pageRows.map((row) => (
+                    <OrderRowView key={row.id} row={row} narrow={narrow} />
+                  ))}
+                </ul>
+                {ordered.length > ORDER_PAGE_SIZES[0] && (
+                  <Pager
+                    page={shownPage}
+                    size={pageSize}
+                    total={ordered.length}
+                    sizes={ORDER_PAGE_SIZES}
+                    onPage={setPage}
+                    onSize={(size) => {
+                      setPageSize(size);
+                      setPage(0);
+                    }}
+                  />
+                )}
+              </>
             )}
           </section>
 
