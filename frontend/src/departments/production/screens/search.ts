@@ -1,11 +1,11 @@
 import type { OrderRow, Task } from "./types";
 
 /**
- * The search boxes on Orders and Tasks (the owner, 21 November 2026). What is typed is split into
- * words; a row matches when every word appears somewhere in what the row is searched by, in any case
- * and in any order, so "black cutting" finds the black order that is at cutting.
+ * The search boxes on Orders, Tasks and the Library (the owner, 21 November 2026). What is typed is
+ * split into words; a row matches when every word appears somewhere in what the row is searched by,
+ * in any case and in any order, so "black cutting" finds the black order that is at cutting.
  */
-function matches(fields: readonly (string | null | undefined)[], query: string): boolean {
+export function matches(fields: readonly (string | null | undefined)[], query: string): boolean {
   const wanted = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   if (wanted.length === 0) return true;
   const text = fields.filter(Boolean).join("\n").toLocaleLowerCase();

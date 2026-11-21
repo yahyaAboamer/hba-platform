@@ -702,3 +702,71 @@ export type RatingTarget = {
 
 /** `GET /api/prod/orders/{id}/ratings`: `ratable` is true only for a closed order. */
 export type OrderRatings = { ratable: boolean; suppliers: RatingTarget[] };
+
+// ── The Library (`/api/prod/library`, ADR 0087) ──────────────────────────────
+
+export type ProductStatus = "active" | "draft" | "archived";
+
+/** One product on the Library list. No money. */
+export type LibraryRow = {
+  /** The Shopify product id. */
+  id: string;
+  title: string;
+  status: ProductStatus;
+  image_url: string | null;
+  /** The variants' titles, in Shopify's order. */
+  sizes: string[];
+  skus: string[];
+  colour_code: string | null;
+  fabric_type: string | null;
+  /** What HBA has added so far. */
+  filled: { details: boolean; cogs: boolean; design: boolean; size_chart: boolean };
+  /** Production orders made of it, any status. */
+  orders: number;
+};
+
+export type LibraryFileKind = "design" | "size_chart" | "pattern";
+
+export type LibraryFile = {
+  id: number;
+  name: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string | null;
+  uploaded_by: string | null;
+  url: string;
+};
+
+/** The cost of goods per piece, in five parts; only for `production.owner`. */
+export type LibraryCogs = {
+  fabric_piastres: number | null;
+  manufacturing_piastres: number | null;
+  printing_piastres: number | null;
+  accessories_piastres: number | null;
+  packaging_piastres: number | null;
+  /** The sum of the parts that are set; `null` when none is. */
+  total_piastres: number | null;
+};
+
+export type LibraryItem = {
+  id: string;
+  title: string;
+  handle: string | null;
+  status: ProductStatus;
+  image_url: string | null;
+  synced_at: string | null;
+  variants: { id: string; title: string; sku: string | null }[];
+  details: {
+    colour_code: string | null;
+    fabric_type: string | null;
+    decoration_type: string | null;
+    decoration_width_cm: string | null;
+    notes: string | null;
+  };
+  /** Absent for anybody without `production.owner`. */
+  cogs?: LibraryCogs;
+  files: Record<LibraryFileKind, LibraryFile[]>;
+  orders: { id: number; code: string; colour: string; status: OrderStatus; planned_total: number; target_date: string }[];
+  updated_at: string | null;
+  updated_by: string | null;
+};

@@ -213,4 +213,4 @@ def test_the_downgrade_refuses_while_a_payment_holds_more_than_one_photo(owner, 
     with pytest.raises(RuntimeError, match="more than one photo"):
         command.downgrade(Config("alembic.ini"), "e5b9a3d70038")
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "f1c2d3e40039"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "a7c3e9d10040"
