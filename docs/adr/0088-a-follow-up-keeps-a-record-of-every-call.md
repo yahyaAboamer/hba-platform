@@ -52,7 +52,8 @@ things, and each adds a line to its history:
      Reply here or tell us a good time to call."*, whose words the owner can
      edit in Feedback setup like the other messages;
    - closed: the approved template `feedback_tried_to_call` (English, one
-     body variable, the order name), which the owner submits to Meta.
+     body variable, the order name). The owner submitted it and Meta
+     approved it on 22 November 2026.
 
    It names the order and offers nothing, so Meta counts it as *utility*.
    Everything in ADR 0059's sending rules and `INBOX_FEEDBACK_ENABLED`
