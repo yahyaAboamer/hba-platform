@@ -47,6 +47,7 @@ from app.modules.inbox.services import feedback, feedback_messages, outbound, se
 from app.modules.inbox.services.events import _conversation
 from app.modules.inbox.services.meta import MetaClient, MetaError
 from app.modules.inbox.services.outbound import NotSent, send_text
+from app.shared.models.identity import UserAccount
 from app.shared.services.audit import record_audit
 from app.shared.services.jobs import JobKind, PermanentFailure, enqueue
 from app.worker import register_handler
@@ -129,6 +130,73 @@ def no_answer_count(db: Session, survey: FeedbackSurvey) -> int:
 def message_sent(db: Session, survey: FeedbackSurvey) -> bool:
     """Whether the "we tried to call you" message went in the current round."""
     return _count(db, survey, "message_sent") > 0
+
+
+def _user_names(db: Session, ids: set[int]) -> dict[int, str]:
+    if not ids:
+        return {}
+    return {
+        user_id: name or email
+        for user_id, name, email in db.execute(
+            select(UserAccount.id, UserAccount.display_name, UserAccount.email).where(
+                UserAccount.id.in_(ids)
+            )
+        )
+    }
+
+
+def describe_many(db: Session, surveys: list[FeedbackSurvey]) -> dict[int, dict]:
+    """What the follow-up looks like for each survey, in two queries however
+    many there are: every history line, then every name on them.
+
+    Per survey id: the ``history`` (oldest first), the current round's
+    ``no_answer_count`` and ``message_sent``, ``waiting_since``, when and by
+    whom it was closed as couldn't reach, and the round.
+    """
+    if not surveys:
+        return {}
+    ids = [survey.id for survey in surveys]
+    entries: dict[int, list[FeedbackFollowUp]] = {survey_id: [] for survey_id in ids}
+    for entry in db.scalars(
+        select(FeedbackFollowUp)
+        .where(FeedbackFollowUp.survey_id.in_(ids))
+        .order_by(FeedbackFollowUp.at, FeedbackFollowUp.id)
+    ):
+        entries[entry.survey_id].append(entry)
+    people = {entry.actor_id for lines in entries.values() for entry in lines if entry.actor_id}
+    people |= {survey.unreached_by for survey in surveys if survey.unreached_by}
+    names = _user_names(db, people)
+    found: dict[int, dict] = {}
+    for survey in surveys:
+        lines = entries[survey.id]
+        current = [entry for entry in lines if entry.round == survey.follow_up_round]
+        waiting = survey.round_started_at or survey.rated_at
+        found[survey.id] = {
+            "history": [
+                {
+                    "id": entry.id,
+                    "round": entry.round,
+                    "kind": entry.kind,
+                    "note": entry.note,
+                    "at": entry.at.isoformat(),
+                    "by_name": names.get(entry.actor_id) if entry.actor_id else None,
+                }
+                for entry in lines
+            ],
+            "no_answer_count": sum(1 for entry in current if entry.kind == "no_answer"),
+            "message_sent": any(entry.kind == "message_sent" for entry in current),
+            "waiting_since": waiting.isoformat() if waiting else None,
+            "unreached_at": survey.unreached_at.isoformat() if survey.unreached_at else None,
+            "unreached_by_name": names.get(survey.unreached_by) if survey.unreached_by else None,
+            "follow_up_round": survey.follow_up_round,
+        }
+    return found
+
+
+def describe_one(db: Session, survey: FeedbackSurvey) -> dict:
+    """One survey as the sheet lists it, with its follow-up."""
+    resolved_by = feedback._names(db, [survey]).get(survey.resolved_by)
+    return feedback.describe(survey, resolved_by, describe_many(db, [survey])[survey.id])
 
 
 def start_round(survey: FeedbackSurvey, at: datetime) -> None:

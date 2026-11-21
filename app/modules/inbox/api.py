@@ -30,7 +30,7 @@ from app.shared.models.identity import UserAccount
 from app.shared.services.audit import record_audit
 from app.modules.inbox.models import FeedbackSettings, InboxMessage
 from app.modules.inbox.services import (
-    chats, connection, feedback, feedback_codes, feedback_messages, feedback_replies,
+    chats, connection, feedback, feedback_codes, feedback_follow_up, feedback_messages, feedback_replies,
     feedback_sheet, health, media, outbound, sending,
 )
 from app.modules.inbox.services.meta import MetaClient, MetaError
@@ -505,11 +505,11 @@ DOWNLOAD_MAX_ROWS = 50_000
 def _sheet_filters(
     since: date | None = Query(None, description="First day she was asked (Cairo)"),
     until: date | None = Query(None, description="Last day she was asked (Cairo), included"),
-    rating: Literal["loved", "okay", "unhappy"] | None = None,
+    rating: Literal["loved", "okay", "unhappy", "none"] | None = None,
     reason: str | None = Query(None, max_length=30),
     product: str | None = Query(None, max_length=120),
     courier: str | None = Query(None, max_length=80),
-    state: Literal["needs_follow_up", "resolved", "reopened"] | None = None,
+    state: Literal["needs_follow_up", "resolved", "reopened", "unreached"] | None = None,
     q: str | None = Query(None, max_length=120),
 ) -> dict:
     """The sheet's filters, shared by the list and the download."""
@@ -553,6 +553,13 @@ def feedback_list(
         # second read (the settings route also asks Shopify).
         "enabled": feedback.enabled(),
     }
+
+
+@router.get("/feedback/follow-up")
+def feedback_follow_up_list(db: Session = Depends(get_session)) -> dict:
+    """Every follow-up still open, longest waiting first, whatever the sheet's
+    filters say (ADR 0087). A test is never in it."""
+    return {"rows": feedback.needs_follow_up(db), "reply_hours": feedback.reply_hours(db)}
 
 
 @router.get("/feedback/download")
@@ -615,6 +622,50 @@ def feedback_resolve(
     survey as the sheet lists it. No note is refused in words."""
     note = body.note if body is not None else ""
     done = _answering(lambda: feedback_replies.resolve(db, survey_id, actor, note))
+    db.commit()
+    return done
+
+
+class NoAnswerBody(BaseModel):
+    note: str | None = None
+    #: From the third call: close it as couldn't reach.
+    close: bool = False
+
+
+@router.post("/feedback/{survey_id}/no-answer")
+def feedback_no_answer(
+    survey_id: int,
+    body: NoAnswerBody | None = None,
+    actor: UserAccount = Depends(GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """A person called her and she did not answer (ADR 0087). The second call
+    of a round queues the WhatsApp message; from the third it can be closed as
+    couldn't reach. Returns the survey as the sheet lists it."""
+    body = body or NoAnswerBody()
+    done = _answering(
+        lambda: feedback_follow_up.describe_one(
+            db, feedback_follow_up.no_answer(db, survey_id, actor, body.note, body.close)
+        )
+    )
+    db.commit()
+    return done
+
+
+@router.post("/feedback/{survey_id}/note")
+def feedback_note(
+    survey_id: int,
+    body: FollowUpNoteBody | None = None,
+    actor: UserAccount = Depends(GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """A note on an open follow-up. It stays open; nothing is sent."""
+    note = body.note if body is not None else ""
+    done = _answering(
+        lambda: feedback_follow_up.describe_one(
+            db, feedback_follow_up.add_note(db, survey_id, actor, note)
+        )
+    )
     db.commit()
     return done
 

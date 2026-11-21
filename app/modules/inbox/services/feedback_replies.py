@@ -492,8 +492,7 @@ def resolve(
         after={"step": survey.step, "order": survey.order_name},
     )
     db.flush()
-    names = feedback._names(db, [survey])
-    return feedback.describe(survey, names.get(survey.resolved_by))
+    return feedback_follow_up.describe_one(db, survey)
 
 
 #: What a survey says when the solved question may or may not have gone out.

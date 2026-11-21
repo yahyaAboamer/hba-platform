@@ -930,9 +930,33 @@ def _iso(at: datetime | None) -> str | None:
     return at.isoformat() if at else None
 
 
-def describe(row: FeedbackSurvey, resolved_by: str | None = None) -> dict:
-    """One survey as a plain dict, for the sheet and the follow-up list."""
+def _follow_up_state(row: FeedbackSurvey) -> str | None:
+    if row.rating == "unhappy" and row.step == "support":
+        return "needs_follow_up"
+    if row.unreached_at is not None:
+        return "unreached"
+    if row.resolved_at is not None:
+        return "resolved"
+    return None
+
+
+def describe(
+    row: FeedbackSurvey, resolved_by: str | None = None, follow_up: dict | None = None
+) -> dict:
+    """One survey as a plain dict, for the sheet and the follow-up list.
+    ``follow_up`` is what ``feedback_follow_up.describe_many`` says of it;
+    without it the history is empty."""
     return {
+        "history": [],
+        "no_answer_count": 0,
+        "message_sent": False,
+        "waiting_since": _iso(row.round_started_at or row.rated_at),
+        "unreached_at": _iso(row.unreached_at),
+        "unreached_by_name": None,
+        "follow_up_round": row.follow_up_round,
+        **(follow_up or {}),
+        "follow_up_state": _follow_up_state(row),
+        "conversation_id": row.conversation_id,
         "id": row.id,
         "order_id": row.shopify_order_id,
         "order_name": row.order_name,
@@ -989,6 +1013,20 @@ def _names(db: Session, rows: list[FeedbackSurvey]) -> dict[int, str]:
     }
 
 
+def _waiting_since():
+    """When the open follow-up's current wait began."""
+    return func.coalesce(FeedbackSurvey.round_started_at, FeedbackSurvey.rated_at)
+
+
+def _described(db: Session, found: list[FeedbackSurvey]) -> list[dict]:
+    # Imported here: feedback_follow_up builds on this module.
+    from app.modules.inbox.services import feedback_follow_up
+
+    names = _names(db, found)
+    extra = feedback_follow_up.describe_many(db, found)
+    return [describe(row, names.get(row.resolved_by), extra[row.id]) for row in found]
+
+
 def needs_follow_up(db: Session) -> list[dict]:
     """Unhappy answers waiting for a person, longest waiting first."""
     rows = list(
@@ -999,13 +1037,13 @@ def needs_follow_up(db: Session) -> list[dict]:
                 FeedbackSurvey.step == "support",
                 FeedbackSurvey.is_test.is_(False),
             )
-            .order_by(FeedbackSurvey.rated_at, FeedbackSurvey.id)
+            .order_by(_waiting_since(), FeedbackSurvey.id)
         )
     )
-    return [describe(row) for row in rows]
+    return _described(db, rows)
 
 
-SHEET_STATES = ("needs_follow_up", "resolved", "reopened")
+SHEET_STATES = ("needs_follow_up", "resolved", "reopened", "unreached")
 
 #: What the sheet and its download call each way a question can stand.
 STATE_LABELS = {
@@ -1062,7 +1100,9 @@ def _filtered(
         query = query.where(asked_at() >= asked_from)
     if asked_before is not None:
         query = query.where(asked_at() < asked_before)
-    if rating:
+    if rating == "none":
+        query = query.where(FeedbackSurvey.rating.is_(None))
+    elif rating:
         query = query.where(FeedbackSurvey.rating == rating)
     if reason:
         query = query.where(FeedbackSurvey.reason == reason)
@@ -1076,12 +1116,15 @@ def _filtered(
         query = query.where(FeedbackSurvey.resolved_at.is_not(None))
     elif state == "reopened":
         query = query.where(FeedbackSurvey.reopened_count > 0)
+    elif state == "unreached":
+        query = query.where(FeedbackSurvey.unreached_at.is_not(None))
     if q and q.strip():
         words = q.strip()[:120]
         digits = "".join(ch for ch in words if ch.isdigit())
         clauses = [
             FeedbackSurvey.order_name.ilike(_like(words.lstrip("#")), escape="\\"),
             FeedbackSurvey.customer_name.ilike(_like(words), escape="\\"),
+            FeedbackSurvey.products.cast(Text).ilike(_like(words), escape="\\"),
         ]
         if len(digits) >= 3:
             clauses.append(FeedbackSurvey.phone.like(_like(digits), escape="\\"))
@@ -1133,8 +1176,7 @@ def rows(
     if limit is not None:
         query = query.limit(max(1, min(limit, 1000)))
     found = list(db.scalars(query.offset(max(0, offset))))
-    names = _names(db, found)
-    return [describe(row, names.get(row.resolved_by)) for row in found]
+    return _described(db, found)
 
 
 def summary(db: Session, **filters) -> dict:
@@ -1145,6 +1187,7 @@ def summary(db: Session, **filters) -> dict:
     rest the sheet lists: failed, no WhatsApp, or only logged (would_send).
     """
     S = FeedbackSurvey
+    overdue_before = utcnow() - timedelta(hours=reply_hours(db))
     found = db.execute(
         _filtered(
             select(
@@ -1158,6 +1201,12 @@ def summary(db: Session, **filters) -> dict:
                 func.count().filter(S.code_sent_at.is_not(None)),
                 func.count().filter(S.code_used_at.is_not(None)),
                 func.count().filter(S.state.in_(("failed", "no_whatsapp", "would_send"))),
+                func.count().filter(
+                    S.rating == "unhappy", S.step == "support",
+                    _waiting_since() < overdue_before,
+                ),
+                func.count().filter(S.solved.is_not(None)),
+                func.count().filter(S.unreached_at.is_not(None)),
             ),
             **filters,
         )
@@ -1165,6 +1214,7 @@ def summary(db: Session, **filters) -> dict:
     keys = (
         "asked", "answered", "loved", "okay", "unhappy",
         "needs_follow_up", "solved", "codes_sent", "codes_used", "not_reached",
+        "overdue", "solved_asked", "unreached",
     )
     return dict(zip(keys, (int(n) for n in found)))
 
@@ -1195,9 +1245,10 @@ def options(db: Session) -> dict:
             for rating in RATINGS
         },
         "states": [
-            {"id": "needs_follow_up", "title": "Needs follow-up"},
+            {"id": "needs_follow_up", "title": "To follow up"},
             {"id": "resolved", "title": "Resolved"},
             {"id": "reopened", "title": "Reopened"},
+            {"id": "unreached", "title": "Couldn't reach"},
         ],
     }
 
@@ -1347,8 +1398,14 @@ def chat_block(db: Session, conversation_id: int) -> dict | None:
             .limit(1)
         )
         row = owed or row
+    # Imported here: feedback_follow_up builds on this module.
+    from app.modules.inbox.services import feedback_follow_up
+
     names = _names(db, [row])
+    extra = feedback_follow_up.describe_many(db, [row])[row.id]
     return {
+        **extra,
+        "reply_hours": reply_hours(db),
         "id": row.id,
         "order_name": row.order_name,
         "asked_at": _iso(row.sent_at or row.created_at),
