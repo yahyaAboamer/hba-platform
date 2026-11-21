@@ -19,6 +19,8 @@ const HOUR = 3_600_000;
 const MINUTE = 60_000;
 /** The server's limit (`feedback_follow_up.NOTE_MAX`). */
 const NOTE_MAX = 1000;
+/** After she has said *No, not solved* this often, *Resolved* closes it without asking (`feedback_replies.MAX_REOPENS`). */
+const MAX_REOPENS = 2;
 
 function when(iso: string): string {
   return `${dayMonth(iso)} ${clockTime(iso)}`;
@@ -141,6 +143,12 @@ export type FollowUpSurvey = {
   reason_title?: string | null;
   no_answer_count?: number;
   message_sent?: boolean;
+  /** How often she has said *No, not solved*. */
+  reopened_count?: number;
+  /** The words the server would send her after the 2nd call; quoted only when given. */
+  tried_to_call_text?: string | null;
+  /** Feedback messages are switched off: nothing is sent to her. */
+  feedback_off?: boolean;
 };
 
 const PATHS: Record<FollowUpAction, string> = {
@@ -180,6 +188,8 @@ export function FollowUpDialog({
   const who = survey.customer_name ?? null;
   const call = (survey.no_answer_count ?? 0) + 1;
   const sent = survey.message_sent ?? false;
+  const lastResolve = (survey.reopened_count ?? 0) >= MAX_REOPENS;
+  const triedWords = survey.tried_to_call_text ?? null;
   const required = action !== "no_answer";
   const canSave = !saving && (!required || note.trim() !== "");
 
@@ -283,16 +293,29 @@ export function FollowUpDialog({
           </p>
         )}
 
-        {action === "resolve" && (
+        {action === "resolve" && lastResolve && (
+          <p className="inbox-fu-hint">
+            This closes the follow-up. She has said it wasn't solved twice, so she won't be asked again.
+          </p>
+        )}
+        {action === "resolve" && !lastResolve && (
           <p className="inbox-fu-hint">
             Tomorrow she'll get a WhatsApp message: <i>"Was your issue solved?"</i> If she says no, she comes back to{" "}
             <b>To follow up</b>.
           </p>
         )}
-        {action === "no_answer" && call === 2 && !sent && (
+        {action === "no_answer" && call === 2 && !sent && survey.feedback_off && (
+          <p className="inbox-fu-hint">Feedback messages are switched off, so nothing will be sent to her.</p>
+        )}
+        {action === "no_answer" && call === 2 && !sent && !survey.feedback_off && (
           <p className="inbox-fu-hint inbox-fu-hint--owed">
-            After this call she'll get a WhatsApp message from the platform:{" "}
-            <i>"We tried to call you about order {order}. Reply here or tell us a good time to call."</i>
+            {triedWords ? (
+              <>
+                After this call she'll get a WhatsApp message from the platform: <i dir="auto">"{triedWords}"</i>
+              </>
+            ) : (
+              "After this call she'll get a WhatsApp message from the platform saying we tried to call her."
+            )}
           </p>
         )}
         {action === "no_answer" && call > 2 && sent && (

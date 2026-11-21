@@ -161,6 +161,8 @@ export type ChatFeedback = {
   is_test?: boolean;
   /** The hours support promises to reach her within (Feedback setup). */
   reply_hours: number;
+  /** Whether feedback messages are being sent at all (the feature's switch on the server). */
+  enabled?: boolean;
 } & FollowUpFields;
 
 export type ConversationDetail = Conversation & {
@@ -301,6 +303,12 @@ export type FollowUpFields = {
   unreached_by_name: string | null;
   follow_up_round: number;
   follow_up_state: "needs_follow_up" | "resolved" | "unreached" | null;
+  /**
+   * The words she would get after the 2nd call with no answer, as the server
+   * would send them now; null once this round's message is accounted for, or
+   * when the follow-up is not open.
+   */
+  tried_to_call_text?: string | null;
 };
 
 /** What her answer is called on screen. */

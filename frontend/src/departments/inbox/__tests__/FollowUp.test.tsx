@@ -92,18 +92,17 @@ describe("the pop-ups", () => {
     expect(document.activeElement).toBe(opener);
   });
 
-  it("the second no-answer warns about the WhatsApp message", async () => {
+  it("the second no-answer quotes the WhatsApp message the server will send", async () => {
     serve(() => [200, { id: 7 }]);
-    render(<FollowUpActions survey={survey({ no_answer_count: 1 })} onDone={() => {}} />);
+    const words = "Nour, we tried to call you about your order #7002. Reply here.";
+    render(<FollowUpActions survey={survey({ no_answer_count: 1, tried_to_call_text: words })} onDone={() => {}} />);
 
     fireEvent.click(screen.getByRole("button", { name: "No answer" }));
 
     const dialog = screen.getByRole("dialog", { name: "No answer: #7002" });
     expect(within(dialog).getByText("This is call 2 for Nour Adel")).toBeTruthy();
     expect(within(dialog).getByLabelText("Note (optional)")).toBeTruthy();
-    expect(dialog.textContent).toContain(
-      "After this call she'll get a WhatsApp message from the platform: \"We tried to call you about order #7002. Reply here or tell us a good time to call.\"",
-    );
+    expect(dialog.textContent).toContain(`After this call she'll get a WhatsApp message from the platform: "${words}"`);
     expect(within(dialog).queryByRole("checkbox")).toBeNull();
     // The note is optional: an empty one can be saved.
     fireEvent.click(within(dialog).getByRole("button", { name: "Save call" }));
@@ -114,6 +113,53 @@ describe("the pop-ups", () => {
       url: "/api/inbox/feedback/7/no-answer",
       body: { note: null, close: false },
     });
+  });
+
+  it("without the server's words, the second no-answer quotes nothing", () => {
+    serve(() => [200, {}]);
+    render(<FollowUpActions survey={survey({ no_answer_count: 1 })} onDone={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "No answer" }));
+
+    const dialog = screen.getByRole("dialog", { name: "No answer: #7002" });
+    expect(dialog.textContent).toContain(
+      "After this call she'll get a WhatsApp message from the platform saying we tried to call her.",
+    );
+    expect(dialog.textContent).not.toContain('"');
+  });
+
+  it("with feedback switched off, the second no-answer says nothing will be sent", () => {
+    serve(() => [200, {}]);
+    render(
+      <FollowUpActions
+        survey={survey({ no_answer_count: 1, feedback_off: true, tried_to_call_text: "We tried to call you" })}
+        onDone={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "No answer" }));
+
+    const dialog = screen.getByRole("dialog", { name: "No answer: #7002" });
+    expect(dialog.textContent).toContain("Feedback messages are switched off, so nothing will be sent to her.");
+    expect(dialog.textContent).not.toContain("she'll get a WhatsApp message");
+  });
+
+  it("resolve after she said not solved twice says it closes without asking again", () => {
+    serve(() => [200, {}]);
+    render(<FollowUpActions survey={survey({ reopened_count: 2 })} onDone={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Resolved…" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Resolve #7002" });
+    expect(dialog.textContent).toContain(
+      "This closes the follow-up. She has said it wasn't solved twice, so she won't be asked again.",
+    );
+    expect(dialog.textContent).not.toContain("Tomorrow");
+  });
+
+  it("resolve after she said not solved once still promises the question", () => {
+    serve(() => [200, {}]);
+    render(<FollowUpActions survey={survey({ reopened_count: 1 })} onDone={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Resolved…" }));
+
+    expect(screen.getByRole("dialog").textContent).toContain("Tomorrow she'll get a WhatsApp message");
   });
 
   it("the first no-answer says nothing will be sent and offers no closing", () => {

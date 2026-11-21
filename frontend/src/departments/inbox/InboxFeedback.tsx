@@ -522,6 +522,7 @@ export function InboxFeedback() {
           now={now}
           headingRef={listHeading}
           onChanged={recorded}
+          feedbackOff={off}
         />
       )}
 

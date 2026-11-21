@@ -355,6 +355,25 @@ describe("the To follow up list", () => {
     );
   });
 
+  it("its pop-ups say what the server will really do", async () => {
+    const twice = { ...WAITING, reopened_count: 2, no_answer_count: 1, message_sent: false };
+    serve({ followUp: () => [200, { rows: [twice], reply_hours: 24 }], enabled: false });
+    show();
+    const list = await screen.findByRole("region", { name: /To follow up/ });
+    await screen.findByRole("table");
+    const card = within(list).getAllByRole("listitem")[0];
+
+    fireEvent.click(within(card).getByRole("button", { name: "Resolved…" }));
+    expect(screen.getByRole("dialog").textContent).toContain(
+      "This closes the follow-up. She has said it wasn't solved twice, so she won't be asked again.",
+    );
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(within(card).getByRole("button", { name: "No answer" }));
+    expect(screen.getByRole("dialog").textContent).toContain(
+      "Feedback messages are switched off, so nothing will be sent to her.",
+    );
+  });
+
   it("goes to the list from the To follow up card", async () => {
     serve({ followUp: () => [200, { rows: [WAITING], reply_hours: 24 }] });
     show();

@@ -155,6 +155,10 @@ export function ChatFeedbackBlock({
             reason_title: view.reason_title,
             no_answer_count: view.no_answer_count ?? 0,
             message_sent: view.message_sent ?? false,
+            reopened_count: view.reopened_count,
+            tried_to_call_text: view.tried_to_call_text ?? null,
+            // An administrator's test is sent even with the switch off.
+            feedback_off: view.enabled === false && !view.is_test,
           }}
           onDone={done}
         />

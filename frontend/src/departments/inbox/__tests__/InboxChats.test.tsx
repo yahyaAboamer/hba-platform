@@ -1010,6 +1010,48 @@ describe("delivery feedback beside the chat", () => {
     expect(headings[1]).toBe("Order");
   });
 
+  it("its pop-ups say what the server will really do", async () => {
+    serve({
+      detail: {
+        feedback: feedback({
+          reopened_count: 2,
+          no_answer_count: 1,
+          message_sent: false,
+          enabled: true,
+          tried_to_call_text: "We tried to call you about your order #7002.",
+          history: [],
+        }),
+      },
+    });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    fireEvent.click(fb.getByRole("button", { name: "Resolved…" }));
+    expect(screen.getByRole("dialog").textContent).toContain(
+      "This closes the follow-up. She has said it wasn't solved twice, so she won't be asked again.",
+    );
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(fb.getByRole("button", { name: "No answer" }));
+    expect(screen.getByRole("dialog").textContent).toContain(
+        `she'll get a WhatsApp message from the platform: "We tried to call you about your order #7002."`,
+    );
+  });
+
+  it("with feedback switched off, the second call promises no message", async () => {
+    serve({
+      detail: {
+        feedback: feedback({ no_answer_count: 1, message_sent: false, enabled: false, history: [] }),
+      },
+    });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    fireEvent.click(fb.getByRole("button", { name: "No answer" }));
+    expect(screen.getByRole("dialog").textContent).toContain(
+      "Feedback messages are switched off, so nothing will be sent to her.",
+    );
+  });
+
   it("tags a test, which is a real survey in every other way: Resolved works", async () => {
     serve({ detail: { feedback: feedback({ order_name: "TEST", is_test: true }) } });
     show("/inbox/chats/12");

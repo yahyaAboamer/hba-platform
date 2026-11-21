@@ -18,6 +18,7 @@ export function FollowUpList({
   now,
   headingRef,
   onChanged,
+  feedbackOff = false,
 }: {
   rows: FeedbackRow[];
   /** The promised hours (Feedback setup). */
@@ -27,6 +28,8 @@ export function FollowUpList({
   headingRef: Ref<HTMLHeadingElement>;
   /** Something was recorded: read the list, the cards and the sheet again. */
   onChanged: () => void;
+  /** Feedback messages are switched off: the pop-ups promise nothing. */
+  feedbackOff?: boolean;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -84,6 +87,9 @@ export function FollowUpList({
                     reason_title: reason,
                     no_answer_count: row.no_answer_count,
                     message_sent: row.message_sent,
+                    reopened_count: row.reopened_count,
+                    tried_to_call_text: row.tried_to_call_text ?? null,
+                    feedback_off: feedbackOff,
                   }}
                   onDone={onChanged}
                 />
