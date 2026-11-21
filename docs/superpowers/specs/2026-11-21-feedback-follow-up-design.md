@@ -199,7 +199,9 @@ note*, and *Closed as couldn't reach* (date and who).
   - A new job kind `INBOX_FEEDBACK_TRIED_TO_CALL`. It follows the
     `ask_solved` pattern (window check, chat message or template, claim and
     release, recovery after an interruption), deduplicated per survey and
-    round.
+    round. The claim is `tried_claimed_round` / `tried_claimed_at` on the
+    survey; the recovery writes a `message_failed` line saying it may have
+    gone out. The last retry writes `message_failed` instead of raising.
   - In the inbound-message path, reopen a recently unreached survey.
 - **API.**
   - `POST /feedback/{id}/resolve` now takes `{note}`.

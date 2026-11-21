@@ -339,12 +339,31 @@ def _sent_words(asked) -> list[str]:
     return [m["text"]["body"] for m in asked if m["type"] == "text"]
 
 
+def _send(db, survey_id, **kw):
+    """``send_tried_to_call`` with its claim stood in for: the real one commits
+    in a session of its own, which cannot see this test's rows."""
+    kw.setdefault("claim", lambda _id, _round: True)
+    kw.setdefault("release", lambda _id, _round: None)
+    return feedback_follow_up.send_tried_to_call(db, survey_id, **kw)
+
+
+@pytest.fixture()
+def claim_stood_in(monkeypatch):
+    """The job's own claim and release, stood in for (see ``_send``)."""
+    released: list = []
+    monkeypatch.setattr(feedback_follow_up, "_claim_tried", lambda _id, _round: True)
+    monkeypatch.setattr(
+        feedback_follow_up, "_release_tried", lambda survey_id, round_: released.append((survey_id, round_))
+    )
+    return released
+
+
 def test_the_message_goes_as_chat_while_her_24_hours_are_open(db, may_send, staff):
     chat = conversation(db, wrote_ago=timedelta(hours=1))
     row = _after_two_calls(db, staff, chat)
     asked: list = []
 
-    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+    _send(db, row.id, client=meta(asked))
 
     words = "We tried to call you about your order #7001. Reply here or tell us a good time to call."
     assert _sent_words(asked) == [words]
@@ -360,7 +379,7 @@ def test_the_template_goes_once_her_24_hours_closed(db, may_send, staff):
     row = _after_two_calls(db, staff, chat)
     asked: list = []
 
-    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+    _send(db, row.id, client=meta(asked))
 
     [body] = asked
     assert body["type"] == "template"
@@ -374,7 +393,7 @@ def test_the_template_goes_once_her_24_hours_closed(db, may_send, staff):
     assert _entries(db, row)[-1].kind == "message_sent"
 
 
-def test_the_window_is_checked_when_sending(db, may_send, feature_on, staff, monkeypatch):
+def test_the_window_is_checked_when_sending(db, may_send, feature_on, staff, monkeypatch, claim_stood_in):
     chat = conversation(db, wrote_ago=timedelta(hours=1))
     row = _after_two_calls(db, staff, chat)
     [(_, _, payload)] = jobs(db, TRIED)
@@ -394,8 +413,8 @@ def test_running_twice_sends_once(db, may_send, staff):
     row = _after_two_calls(db, staff, chat)
     asked: list = []
 
-    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
-    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+    _send(db, row.id, client=meta(asked))
+    _send(db, row.id, client=meta(asked))
 
     assert len(asked) == 1
     assert _kinds(db, row).count("message_sent") == 1
@@ -411,7 +430,7 @@ def test_a_message_already_in_the_chat_is_not_sent_again(db, may_send, staff):
     )
     asked: list = []
 
-    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+    _send(db, row.id, client=meta(asked))
 
     assert asked == []
     assert _kinds(db, row)[-1] == "message_sent"
@@ -423,7 +442,7 @@ def test_a_template_meta_refuses_tells_the_team(db, may_send, staff):
     asked: list = []
 
     # Not approved yet: Meta refuses it, and asking again would not help.
-    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked, refuse=(404, 132001)))
+    _send(db, row.id, client=meta(asked, refuse=(404, 132001)))
 
     last = _entries(db, row)[-1]
     assert last.kind == "message_failed"
@@ -437,7 +456,7 @@ def test_sending_off_tells_the_team(db, connected, staff):
     row = _after_two_calls(db, staff, chat)
     asked: list = []
 
-    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+    _send(db, row.id, client=meta(asked))
 
     assert asked == []
     last = _entries(db, row)[-1]
@@ -469,7 +488,7 @@ def test_resolved_before_the_job_ran_sends_nothing(db, may_send, feature_on, sta
     feedback_replies.resolve(db, row.id, staff, "She answered the third time")
     asked: list = []
 
-    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+    _send(db, row.id, client=meta(asked))
 
     assert asked == []
     assert _kinds(db, row)[-1] == "resolved"
@@ -478,3 +497,190 @@ def test_resolved_before_the_job_ran_sends_nothing(db, may_send, feature_on, sta
 def test_the_job_needs_a_survey(db):
     with pytest.raises(PermanentFailure):
         feedback_follow_up._handle_tried_to_call(db, {})
+
+
+# ── Claimed before it is sent, and never sent twice ───────────────────────────
+
+
+def test_the_message_is_claimed_before_whatsapp_is_asked(db, may_send, staff):
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    asked: list = []
+    seen: list = []
+
+    _send(db, row.id, client=meta(asked), claim=lambda sid, rnd: seen.append((sid, rnd, len(asked))) or True)
+
+    assert seen == [(row.id, 0, 0)] and len(asked) == 1
+    assert _kinds(db, row)[-1] == "message_sent"
+
+
+def test_a_message_another_run_claimed_is_not_sent(db, may_send, staff):
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    asked: list = []
+
+    _send(db, row.id, client=meta(asked), claim=lambda _id, _round: False)
+
+    assert asked == []
+    assert _kinds(db, row) == ["no_answer", "no_answer"]
+
+
+def test_a_crash_after_whatsapp_took_it_never_sends_it_twice(db, may_send, staff):
+    """The first run claimed it (committed) and WhatsApp took the message; the
+    job then died before its own commit, so nothing is in the chat. The retry
+    finds the claim and sends nothing; the sweep reports it later."""
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    row.tried_claimed_round, row.tried_claimed_at = 0, utcnow()
+    db.flush()
+    asked: list = []
+
+    _send(db, row.id, client=meta(asked))
+
+    assert asked == []
+    assert _kinds(db, row) == ["no_answer", "no_answer"]
+
+
+def test_a_claim_from_an_earlier_round_does_not_stop_this_rounds_message(db, may_send, staff):
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    row.tried_claimed_round, row.tried_claimed_at = 0, utcnow() - timedelta(days=2)
+    row.follow_up_round = 1
+    db.flush()
+    asked: list = []
+
+    _send(db, row.id, client=meta(asked))
+
+    assert len(asked) == 1
+
+
+@pytest.mark.parametrize("window_open", [True, False])
+def test_a_retryable_error_gives_the_claim_back_and_is_raised(db, may_send, staff, window_open):
+    chat = conversation(db, wrote_ago=timedelta(hours=1 if window_open else 30))
+    row = _after_two_calls(db, staff, chat)
+    released: list = []
+
+    with pytest.raises(feedback_follow_up.MetaError):
+        _send(db, row.id, client=meta([], refuse=(400, 131000)), release=lambda s, r: released.append((s, r)))
+
+    assert released == [(row.id, 0)]
+    assert (row.tried_claimed_round, row.tried_claimed_at) == (None, None)
+    assert _kinds(db, row) == ["no_answer", "no_answer"]
+    assert db.query(InboxMessage).filter(InboxMessage.source_ref.like("fbt:%")).count() == 0
+
+
+@pytest.mark.parametrize("window_open", [True, False])
+def test_the_last_try_tells_the_team_instead_of_raising(db, may_send, staff, window_open):
+    chat = conversation(db, wrote_ago=timedelta(hours=1 if window_open else 30))
+    row = _after_two_calls(db, staff, chat)
+    released: list = []
+
+    _send(
+        db, row.id, client=meta([], refuse=(400, 131000)), final_attempt=True,
+        release=lambda s, r: released.append((s, r)),
+    )
+
+    assert released == []
+    last = _entries(db, row)[-1]
+    assert last.kind == "message_failed"
+    assert last.note.startswith("Couldn't send the WhatsApp message: WhatsApp did not answer")
+    assert last.note.endswith("Write to her yourself.")
+    assert row.step == "support"
+
+
+def _running(db, row, attempts: int) -> None:
+    from app.shared.models.integration import BackgroundJob
+    from app.shared.services.jobs import JobStatus
+
+    job = db.scalar(select(BackgroundJob).where(BackgroundJob.kind == TRIED))
+    job.status, job.attempts = JobStatus.RUNNING, attempts
+    db.flush()
+
+
+def test_the_job_knows_its_last_try(db, may_send, feature_on, staff, monkeypatch, claim_stood_in):
+    from app.shared.services.jobs import MAX_ATTEMPTS
+
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    monkeypatch.setattr(outbound, "_client", lambda _db: meta([], refuse=(400, 131000)))
+
+    _running(db, row, attempts=0)
+    with pytest.raises(feedback_follow_up.MetaError):
+        feedback_follow_up._handle_tried_to_call(db, {"survey_id": row.id})
+    assert claim_stood_in == [(row.id, 0)]
+    assert _kinds(db, row)[-1] == "no_answer"
+
+    _running(db, row, attempts=MAX_ATTEMPTS - 1)
+    feedback_follow_up._handle_tried_to_call(db, {"survey_id": row.id})
+    assert _kinds(db, row)[-1] == "message_failed"
+
+
+def test_a_claim_with_nothing_to_show_for_it_is_reported(db, may_send, staff):
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    row.tried_claimed_round, row.tried_claimed_at = 0, utcnow() - timedelta(minutes=11)
+    db.flush()
+
+    assert feedback_follow_up.recover_interrupted_tried(db) == 1
+
+    last = _entries(db, row)[-1]
+    assert (last.kind, last.round, last.actor_id) == ("message_failed", 0, None)
+    assert last.note == feedback_follow_up.INTERRUPTED_TRIED
+    assert "may have gone out" in last.note and "Check the chat" in last.note
+    # Reported once; never sent again on its own.
+    assert feedback_follow_up.recover_interrupted_tried(db) == 0
+    asked: list = []
+    _send(db, row.id, client=meta(asked))
+    assert asked == []
+
+
+def test_a_claim_that_is_recent_or_has_its_message_is_not_reported(db, may_send, staff):
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    row.tried_claimed_round, row.tried_claimed_at = 0, utcnow() - timedelta(minutes=2)
+    db.flush()
+    assert feedback_follow_up.recover_interrupted_tried(db) == 0
+
+    # In the chat under this round's reference, with its history line lost.
+    outbound.record_outbound(
+        db, chat, kind="text", body="We tried to call you", origin="automatic",
+        status="sent", source_ref=f"fbt:{row.id}:0",
+    )
+    row.tried_claimed_at = utcnow() - timedelta(minutes=30)
+    db.flush()
+    assert feedback_follow_up.recover_interrupted_tried(db) == 0
+
+
+def test_the_sweep_reports_interrupted_messages(db, monkeypatch):
+    called: list = []
+    monkeypatch.setattr(feedback_follow_up, "recover_interrupted_tried", lambda d, now=None: called.append(now) or 0)
+    monkeypatch.setattr(feedback, "get_settings", lambda d: (_ for _ in ()).throw(RuntimeError("stop")))
+
+    with pytest.raises(RuntimeError, match="stop"):
+        feedback.sweep(db)
+
+    assert len(called) == 1
+
+
+def test_the_real_claim_is_taken_once_per_round_and_can_be_given_back(fresh_database):
+    from app.db import SessionLocal
+
+    with SessionLocal() as own:
+        row = _open(own, phone=HER)
+        own.commit()
+        survey_id = row.id
+
+    assert feedback_follow_up._claim_tried(survey_id, 0) is True
+    assert feedback_follow_up._claim_tried(survey_id, 0) is False
+    feedback_follow_up._release_tried(survey_id, 0)
+    assert feedback_follow_up._claim_tried(survey_id, 0) is True
+    # A round the survey is not in is not claimed.
+    assert feedback_follow_up._claim_tried(survey_id, 1) is False
+    with SessionLocal() as own:
+        found = own.get(FeedbackSurvey, survey_id)
+        assert found.tried_claimed_round == 0 and found.tried_claimed_at is not None
+        found.step = "done"
+        own.commit()
+    # Closed since: nothing to claim.
+    feedback_follow_up._release_tried(survey_id, 0)
+    assert feedback_follow_up._claim_tried(survey_id, 0) is False

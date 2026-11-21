@@ -59,6 +59,15 @@ things, and each adds a line to its history:
    applies. If it cannot be sent, including while the template is not yet
    approved, the history says *Couldn't send the WhatsApp message: … Write to
    her yourself.* It is not retried on its own.
+
+   It is claimed for the round (`tried_claimed_round`, `tried_claimed_at`)
+   in a committed transaction of its own before WhatsApp is asked, as the
+   solved question is, so a crash after WhatsApp took it never sends it
+   twice; no row lock is held while WhatsApp is asked. WhatsApp not answering
+   gives the claim back and the job tries again; on its last try the history
+   says it could not be sent. A claim with nothing in the chat ten minutes
+   later gets the line *Interrupted while sending … it may have gone out.
+   Check the chat in WhatsApp before writing to her.*
 5. **Couldn't reach** closes the follow-up (step `done`, with who and when).
    She leaves *To follow up*, Today and the sidebar count. She is not asked
    whether her issue was solved and gets no code.

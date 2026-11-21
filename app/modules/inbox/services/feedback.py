@@ -540,7 +540,7 @@ def sweep(
     if interrupted:
         logger.warning("%s feedback questions were interrupted while sending", interrupted)
     # Imported here: the replies build on this module.
-    from app.modules.inbox.services import feedback_codes, feedback_replies
+    from app.modules.inbox.services import feedback_codes, feedback_follow_up, feedback_replies
 
     # Rewards that were spent since the last pass: one query, no Shopify.
     spent = feedback_codes.mark_used(db)
@@ -548,6 +548,8 @@ def sweep(
         logger.info("%s feedback codes were used", spent)
     if feedback_replies.recover_interrupted_solved(db, now):
         logger.warning("solved questions were interrupted while sending")
+    if feedback_follow_up.recover_interrupted_tried(db, now):
+        logger.warning("tried-to-call messages were interrupted while sending")
     requeued = requeue_stale_pending(db, now)
     if requeued:
         logger.warning("%s feedback questions were never sent; queued again", requeued)
@@ -954,6 +956,7 @@ def describe(
         "unreached_at": _iso(row.unreached_at),
         "unreached_by_name": None,
         "follow_up_round": row.follow_up_round,
+        "tried_to_call_text": None,
         **(follow_up or {}),
         "follow_up_state": _follow_up_state(row),
         "conversation_id": row.conversation_id,
@@ -1406,6 +1409,8 @@ def chat_block(db: Session, conversation_id: int) -> dict | None:
     return {
         **extra,
         "reply_hours": reply_hours(db),
+        # Whether anything is sent at all (a test aside): the pop-ups say so.
+        "enabled": enabled(),
         "id": row.id,
         "order_name": row.order_name,
         "asked_at": _iso(row.sent_at or row.created_at),

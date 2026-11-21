@@ -219,6 +219,7 @@ def test_one_row_has_everything_the_screen_needs(client, sheet):
         "unreached_at": None,
         "unreached_by_name": None,
         "follow_up_round": 0,
+        "tried_to_call_text": None,
         "follow_up_state": "resolved",
     }
     print("ROW", json.dumps(row))
@@ -482,9 +483,10 @@ def test_the_chat_carries_the_latest_survey(client, sheet):
         "unreached_at": None,
         "unreached_by_name": None,
         "follow_up_round": 0,
+        "tried_to_call_text": "We tried to call you about your order #7002. Reply here or tell us a good time to call.",
         "reply_hours": 24,
+        "enabled": False,
     }
-    print("CHAT", json.dumps(detail["feedback"]))
     used = client.get(f"/api/inbox/conversations/{sheet['nour']}").json()["feedback"]
     assert used["code"] == "FB-AAAAAA" and used["code_used"] is True
     resolved = client.get(f"/api/inbox/conversations/{sheet['habiba']}").json()["feedback"]
@@ -830,4 +832,36 @@ def test_a_list_of_surveys_is_read_in_a_fixed_number_of_queries(client, sheet):
         finally:
             event.remove(engine, "before_cursor_execute", listener)
     assert len(found) == len(rows) >= 7
-    assert len(count) <= 2
+    # The history, the names on it, the wording and the chats' 24 hours.
+    assert len(count) <= 4
+
+
+def test_the_chat_says_whether_feedback_is_switched_on(client, sheet, monkeypatch):
+    monkeypatch.setattr("app.config.settings.inbox_feedback_enabled", True)
+    assert client.get(f"/api/inbox/conversations/{sheet['salma']}").json()["feedback"]["enabled"] is True
+
+
+def test_an_open_follow_up_carries_the_words_she_would_be_sent(client, sheet):
+    """The chat message's words while her 24 hours are open, the approved
+    message's once they have closed, and nothing once it is accounted for or
+    the follow-up is not open."""
+    with SessionLocal() as db:
+        db.get(InboxConversation, sheet["mona"]).last_inbound_at = utcnow() - timedelta(hours=30)
+        saved = db.get(FeedbackSettings, 1) or FeedbackSettings(id=1)
+        saved.messages = {"tried_to_call": "{name}, we called about {order}."}
+        db.add(saved)
+        db.commit()
+    rows = {r["order_name"]: r for r in client.get("/api/inbox/feedback/follow-up").json()["rows"]}
+    assert rows["#7002"]["tried_to_call_text"] == "Salma, we called about #7002."
+    assert rows["#7004"]["tried_to_call_text"] == feedback.TRIED_CHAT.format(order="#7004")
+    sheet_rows = {r["order_name"]: r for r in client.get("/api/inbox/feedback").json()["rows"]}
+    assert sheet_rows["#7001"]["tried_to_call_text"] is None
+
+    from app.modules.inbox.services import feedback_follow_up
+
+    with SessionLocal() as db:
+        row = db.get(FeedbackSurvey, sheet["unhappy"])
+        feedback_follow_up.add_entry(db, row, "message_failed", note="Couldn't send")
+        db.commit()
+    rows = {r["order_name"]: r for r in client.get("/api/inbox/feedback/follow-up").json()["rows"]}
+    assert rows["#7002"]["tried_to_call_text"] is None

@@ -434,6 +434,11 @@ class FeedbackSurvey(Base):
         CheckConstraint("attempts >= 0", name="feedback_survey_attempts_not_negative"),
         CheckConstraint("reopened_count >= 0", name="feedback_survey_reopened_not_negative"),
         CheckConstraint("follow_up_round >= 0", name="feedback_survey_round_not_negative"),
+        # A claim on the tried-to-call message is its round and its time, or neither.
+        CheckConstraint(
+            "(tried_claimed_round IS NULL) = (tried_claimed_at IS NULL)",
+            name="feedback_survey_tried_claim_whole",
+        ),
         # What the sender picks up next.
         Index(
             "feedback_survey_due",
@@ -530,6 +535,14 @@ class FeedbackSurvey(Base):
     unreached_by: Mapped[int | None] = mapped_column(
         ForeignKey("user_account.id", ondelete="SET NULL")
     )
+    #: The round whose "we tried to call you" message was taken for sending,
+    #: and when (``feedback_follow_up.send_tried_to_call``). Committed before
+    #: WhatsApp is asked, so a crash after WhatsApp took it can never send it
+    #: twice; given back only when nothing went out and the job will try
+    #: again. A claim with nothing in the chat to show for it is reported in
+    #: the history by ``feedback_follow_up.recover_interrupted_tried``.
+    tried_claimed_round: Mapped[int | None] = mapped_column(Integer)
+    tried_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Her reward: one code inside the platform's one Shopify discount.
     #: Unique among surveys. Shopify treats codes without regard to case; ours

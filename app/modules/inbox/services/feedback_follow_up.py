@@ -19,26 +19,33 @@ message are per round, so a second round can send the message once more.
 - A message she **types** within **14 days** of that close opens it again
   (``reopen_if_unreached``). A button tap is not her writing back.
 
-Every action locks the survey row first (``lock_open``), so two people
-pressing at once are taken one after the other: the second sees what the
-first did, and the message is queued once.
+Every action a person takes locks the survey row first (``lock_open``), so
+two people pressing at once are taken one after the other: the second sees
+what the first did, and the message is queued once.
 
 **The "we tried to call you" message** (``send_tried_to_call``) goes once per
 round: as a chat message if her 24 hours are open when it is sent, otherwise
-as the approved template ``feedback_tried_to_call``. If it cannot go, the
-history says so and tells the team to write to her themselves; it is not
-tried again on its own.
+as the approved template ``feedback_tried_to_call``. It is claimed for the
+round in a committed transaction of its own before WhatsApp is asked, and no
+row lock is held while WhatsApp is asked. WhatsApp not answering is tried
+again by the job, until its last try. If it cannot go, the history says so
+and tells the team to write to her themselves; if the run was interrupted
+after the claim, the sweep says it may have gone out
+(``recover_interrupted_tried``). Neither is tried again on its own.
 """
 
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, or_, select, update
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.businesstime import utcnow
 from app.modules.inbox.models import (
     FeedbackFollowUp,
+    FeedbackSettings,
     FeedbackSurvey,
     InboxConversation,
     InboxMessage,
@@ -48,8 +55,9 @@ from app.modules.inbox.services.events import _conversation
 from app.modules.inbox.services.meta import MetaClient, MetaError
 from app.modules.inbox.services.outbound import NotSent, send_text
 from app.shared.models.identity import UserAccount
+from app.shared.models.integration import BackgroundJob
 from app.shared.services.audit import record_audit
-from app.shared.services.jobs import JobKind, PermanentFailure, enqueue
+from app.shared.services.jobs import MAX_ATTEMPTS, JobKind, JobStatus, PermanentFailure, enqueue
 from app.worker import register_handler
 
 #: The longest a note may be, once trimmed.
@@ -145,13 +153,56 @@ def _user_names(db: Session, ids: set[int]) -> dict[int, str]:
     }
 
 
+def _words_owed(
+    db: Session, surveys: list[FeedbackSurvey], entries: dict[int, list[FeedbackFollowUp]]
+) -> dict[int, str]:
+    """The words of the "we tried to call you" message each open follow-up
+    would get if it went now, for the pop-up to quote: the chat message while
+    her 24 hours are open, the approved message's once they have closed. Only
+    where this round's message is not yet accounted for or taken. At most two
+    queries however many there are: the wording, then the chats."""
+    owed = [
+        survey
+        for survey in surveys
+        if is_open(survey)
+        and survey.tried_claimed_round != survey.follow_up_round
+        and not any(
+            entry.round == survey.follow_up_round
+            and entry.kind in ("message_sent", "message_failed")
+            for entry in entries[survey.id]
+        )
+    ]
+    if not owed:
+        return {}
+    cfg = db.get(FeedbackSettings, 1)
+    chat_ids = {survey.conversation_id for survey in owed if survey.conversation_id}
+    chats = (
+        {c.id: c for c in db.scalars(select(InboxConversation).where(InboxConversation.id.in_(chat_ids)))}
+        if chat_ids
+        else {}
+    )
+    now = utcnow()
+    found: dict[int, str] = {}
+    for survey in owed:
+        chat = chats.get(survey.conversation_id)
+        if chat is not None and outbound.window_open(chat, now):
+            found[survey.id] = tried_to_call_words(cfg, survey)
+        else:
+            found[survey.id] = feedback.TRIED_CHAT.format(
+                order=survey.order_name or survey.shopify_order_id
+            )
+    return found
+
+
 def describe_many(db: Session, surveys: list[FeedbackSurvey]) -> dict[int, dict]:
-    """What the follow-up looks like for each survey, in two queries however
-    many there are: every history line, then every name on them.
+    """What the follow-up looks like for each survey, in a fixed number of
+    queries however many there are: every history line, every name on them,
+    and for open ones the wording and their chats (``_words_owed``).
 
     Per survey id: the ``history`` (oldest first), the current round's
     ``no_answer_count`` and ``message_sent``, ``waiting_since``, when and by
-    whom it was closed as couldn't reach, and the round.
+    whom it was closed as couldn't reach, the round, and
+    ``tried_to_call_text`` (null unless the message is still to go).
     """
     if not surveys:
         return {}
@@ -166,6 +217,7 @@ def describe_many(db: Session, surveys: list[FeedbackSurvey]) -> dict[int, dict]
     people = {entry.actor_id for lines in entries.values() for entry in lines if entry.actor_id}
     people |= {survey.unreached_by for survey in surveys if survey.unreached_by}
     names = _user_names(db, people)
+    words = _words_owed(db, surveys, entries)
     found: dict[int, dict] = {}
     for survey in surveys:
         lines = entries[survey.id]
@@ -189,6 +241,7 @@ def describe_many(db: Session, surveys: list[FeedbackSurvey]) -> dict[int, dict]
             "unreached_at": survey.unreached_at.isoformat() if survey.unreached_at else None,
             "unreached_by_name": names.get(survey.unreached_by) if survey.unreached_by else None,
             "follow_up_round": survey.follow_up_round,
+            "tried_to_call_text": words.get(survey.id),
         }
     return found
 
@@ -341,6 +394,12 @@ def reopen_if_unreached(db: Session, phone: str, at: datetime) -> bool:
 
 # ── "We tried to call you" ────────────────────────────────────────────────────
 
+#: What the history says when the message may or may not have gone out.
+INTERRUPTED_TRIED = (
+    "Interrupted while sending the WhatsApp message that we tried to call her: "
+    "it may have gone out. Check the chat in WhatsApp before writing to her."
+)
+
 
 def _reference(survey: FeedbackSurvey) -> str:
     """One per survey and round: what finds the message in the chat."""
@@ -357,34 +416,97 @@ def _failed(db: Session, survey: FeedbackSurvey, why: str, now: datetime) -> Non
     add_entry(db, survey, "message_failed", note=COULD_NOT_SEND.format(why=why)[:NOTE_MAX], at=now)
 
 
+def _claim_tried(survey_id: int, round_: int) -> bool:
+    """Take this round's message for sending, in a transaction of its own.
+
+    Committed before WhatsApp is asked: whatever happens next - a crash after
+    WhatsApp accepted it, a lost lease, a second worker - the message counts
+    as taken and nobody sends it a second time. Only while the follow-up is
+    open and still in that round.
+    """
+    from app.db import SessionLocal
+
+    with SessionLocal() as own:
+        claimed = own.execute(
+            update(FeedbackSurvey)
+            .where(
+                FeedbackSurvey.id == survey_id,
+                FeedbackSurvey.rating == "unhappy",
+                FeedbackSurvey.step == "support",
+                FeedbackSurvey.follow_up_round == round_,
+                or_(
+                    FeedbackSurvey.tried_claimed_round.is_(None),
+                    FeedbackSurvey.tried_claimed_round != round_,
+                ),
+            )
+            .values(tried_claimed_round=round_, tried_claimed_at=utcnow())
+        ).rowcount
+        own.commit()
+    return claimed == 1
+
+
+def _release_tried(survey_id: int, round_: int) -> None:
+    """Give the claim back, in a transaction of its own, because nothing went
+    out and the job is to be tried again."""
+    from app.db import SessionLocal
+
+    with SessionLocal() as own:
+        own.execute(
+            update(FeedbackSurvey)
+            .where(FeedbackSurvey.id == survey_id, FeedbackSurvey.tried_claimed_round == round_)
+            .values(tried_claimed_round=None, tried_claimed_at=None)
+        )
+        own.commit()
+
+
+def _set_claim(survey: FeedbackSurvey, round_: int | None, at: datetime | None) -> None:
+    """What a claim committed elsewhere did, as this session sees it."""
+    set_committed_value(survey, "tried_claimed_round", round_)
+    set_committed_value(survey, "tried_claimed_at", at)
+
+
 def send_tried_to_call(
     db: Session,
     survey_id: int,
     *,
     client: MetaClient | None = None,
     now: datetime | None = None,
+    final_attempt: bool = False,
+    claim: Callable[[int, int], bool] | None = None,
+    release: Callable[[int, int], None] | None = None,
 ) -> FeedbackSurvey | None:
     """Tell her we tried to call, once this round: as a chat message if her
     24 hours are open now, otherwise as the approved template.
 
     Does nothing unless the follow-up is still open (someone may have reached
     her, or closed it, since the job was queued) and the message is not yet
-    accounted for. **Sent at most once a round**: the survey row is locked,
-    and a message already in the chat under this round's reference only gets
-    its missing line in the history.
+    accounted for. A message already in the chat under this round's
+    reference only gets its missing line in the history.
 
-    - A *retryable* Meta error (WhatsApp did not answer) is raised, so the job
-      is tried again; nothing is written.
+    **Claimed before WhatsApp is asked** (``tried_claimed_round`` and
+    ``tried_claimed_at``, committed in a session of its own), so it is **sent
+    at most once a round**, even if this run dies after WhatsApp took it. The
+    survey row is not locked while WhatsApp is asked: the claim is what keeps
+    a second run out.
+
+    - A *retryable* Meta error (WhatsApp did not answer): the claim is given
+      back and the error raised, so the job is tried again - unless this is
+      the job's ``final_attempt``, when it is written in the history like any
+      other failure, telling the team to write to her.
     - Anything else that stops it - sending is off, this server may not
       message her, WhatsApp refused it for good (a template not approved yet,
       say) - is written in the history, telling the team to write to her.
+    - A crash: the claim stands and no message is in the chat; the sweep
+      writes in the history that it may have gone out
+      (``recover_interrupted_tried``). It is not sent again on its own.
     """
-    survey = db.scalar(
-        select(FeedbackSurvey).where(FeedbackSurvey.id == survey_id).with_for_update()
-    )
+    claim = claim or _claim_tried
+    release = release or _release_tried
+    survey = db.get(FeedbackSurvey, survey_id)
     if survey is None or not is_open(survey) or not survey.phone or _settled(db, survey):
         return survey
     now = now or utcnow()
+    round_ = survey.follow_up_round
     reference = _reference(survey)
     already = db.scalar(
         select(InboxMessage).where(InboxMessage.source_ref == reference).limit(1)
@@ -396,6 +518,10 @@ def send_tried_to_call(
         else:
             add_entry(db, survey, "message_sent", note=already.body, at=now)
         return survey
+    if survey.tried_claimed_round == round_:
+        # Taken by another run: still sending, or gone with nothing to show
+        # for it, which the sweep reports. Never sent twice.
+        return survey
     if (why := sending.refusal(db, survey.phone)) is not None:
         _failed(db, survey, why, now)
         return survey
@@ -403,19 +529,32 @@ def send_tried_to_call(
     conversation = (
         db.get(InboxConversation, survey.conversation_id) if survey.conversation_id else None
     ) or _conversation(db, survey.phone, None)
-    order = survey.order_name or survey.shopify_order_id
+    # Her 24 hours are looked at now, not when the call was recorded.
+    words = (
+        tried_to_call_words(feedback.get_settings(db), survey)
+        if outbound.window_open(conversation, now)
+        else None
+    )
+    if not claim(survey.id, round_):
+        return survey
+    _set_claim(survey, round_, now)
     try:
-        # Her 24 hours are looked at now, not when the call was recorded.
-        if outbound.window_open(conversation, now):
-            words = feedback_messages.text(
-                feedback.get_settings(db), "tried_to_call",
-                name=feedback_messages.first_name(survey), order=order,
-            )
+        if words is not None:
             message = send_text(
                 db, conversation, words, origin="automatic", source_ref=reference, client=client
             )
         else:
             message = _send_tried_template(db, survey, conversation, reference, client)
+    except MetaError as exc:
+        if final_attempt:
+            # Nobody is coming back to try again: the claim stands, and the
+            # line settles the round.
+            _failed(db, survey, str(exc), now)
+            survey.updated_at = now
+            return survey
+        release(survey.id, round_)
+        _set_claim(survey, None, None)
+        raise
     except NotSent as exc:
         _failed(db, survey, str(exc), now)
         return survey
@@ -425,6 +564,53 @@ def send_tried_to_call(
         add_entry(db, survey, "message_sent", note=message.body, at=now)
     survey.updated_at = now
     return survey
+
+
+def tried_to_call_words(cfg: FeedbackSettings | None, survey: FeedbackSurvey) -> str:
+    """The chat message's words for her, filled in: what goes while her 24
+    hours are open."""
+    return feedback_messages.text(
+        cfg, "tried_to_call",
+        name=feedback_messages.first_name(survey),
+        order=survey.order_name or survey.shopify_order_id,
+    )
+
+
+def recover_interrupted_tried(db: Session, now: datetime | None = None) -> int:
+    """Messages claimed with nothing in the chat to show for it ten minutes
+    later: the history says it may have gone out and to check the chat. Never
+    sent again on its own, because the platform cannot know whether it went.
+    Returns how many were reported."""
+    now = now or utcnow()
+    S, F = FeedbackSurvey, FeedbackFollowUp
+    reference = func.concat("fbt:", S.id, ":", S.tried_claimed_round)
+    stuck = list(
+        db.scalars(
+            select(S).where(
+                S.tried_claimed_round.is_not(None),
+                S.tried_claimed_at < now - outbound.INTERRUPTED_AFTER,
+                ~exists().where(InboxMessage.source_ref == reference),
+                ~exists().where(
+                    F.survey_id == S.id,
+                    F.round == S.tried_claimed_round,
+                    F.kind.in_(("message_sent", "message_failed")),
+                ),
+            )
+        )
+    )
+    for survey in stuck:
+        # In the round it was claimed for, which may not be the current one.
+        db.add(
+            FeedbackFollowUp(
+                survey_id=survey.id,
+                round=survey.tried_claimed_round,
+                kind="message_failed",
+                note=INTERRUPTED_TRIED,
+                at=now,
+            )
+        )
+    db.flush()
+    return len(stuck)
 
 
 def _send_tried_template(
@@ -469,6 +655,28 @@ def _send_tried_template(
     )
 
 
+def _final_attempt(db: Session, survey_id: int) -> bool:
+    """Whether this is the job's last try at the message.
+
+    The job's own count of failed tries is the only thing that survives a
+    failed run (the run's own writes are rolled back), so it is read from the
+    job's row, found by its key (survey, then round). Not found (run by hand,
+    in a test) is the last try: nobody is coming back to try again.
+    """
+    kind = JobKind.INBOX_FEEDBACK_TRIED_TO_CALL
+    failed = db.scalar(
+        select(BackgroundJob.attempts)
+        .where(
+            BackgroundJob.kind == kind,
+            BackgroundJob.dedupe_key.startswith(f"{kind}:{survey_id}:", autoescape=True),
+            BackgroundJob.status == JobStatus.RUNNING,
+        )
+        .order_by(BackgroundJob.id.desc())
+        .limit(1)
+    )
+    return failed is None or failed + 1 >= MAX_ATTEMPTS
+
+
 @register_handler(JobKind.INBOX_FEEDBACK_TRIED_TO_CALL)
 def _handle_tried_to_call(db: Session, payload: dict) -> None:
     survey_id = payload.get("survey_id")
@@ -486,4 +694,4 @@ def _handle_tried_to_call(db: Session, payload: dict) -> None:
         if survey is not None and is_open(survey) and not _settled(db, survey):
             _failed(db, survey, "feedback is switched off.", utcnow())
         return
-    send_tried_to_call(db, survey_id)
+    send_tried_to_call(db, survey_id, final_attempt=_final_attempt(db, survey_id))
