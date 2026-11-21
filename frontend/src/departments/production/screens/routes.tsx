@@ -3,6 +3,8 @@ import { Navigate, Route, useParams } from "react-router-dom";
 import { Onward } from "../../../frame/Onward";
 import type { Session } from "../../../lib/api";
 import { IncomingScreen } from "./IncomingScreen";
+import { LibraryList } from "./LibraryList";
+import { LibraryPage } from "./LibraryPage";
 import { NewOrder } from "./NewOrder";
 import { OrderList } from "./OrderList";
 import { OrderPage } from "./OrderPage";
@@ -18,7 +20,7 @@ import { TaskScreen } from "./TaskScreen";
  * The pages of the old framed Production (`production-ui`, retired in the
  * switch-over, ADR 0085) and the nearest page each has now: orders to Orders,
  * tasks, samples and problems to Tasks, receiving to Incoming, suppliers to
- * Suppliers, and every other page (products, costs, reports, ...) to the
+ * Suppliers, products to the Library, and every other page (costs, reports, ...) to the
  * Overview. Bookmarks and emails keep working; nothing of the old app is left
  * to answer them. `suppliers`, `suppliers/:code`, `payments` and `settings` exist here
  * too, so they are screens and not in this list.
@@ -37,7 +39,7 @@ export const OLD_PAGES: Readonly<Record<string, string>> = {
   "supplier-portal": "suppliers",
   dashboard: "overview",
   login: "overview",
-  products: "overview",
+  products: "library",
   materials: "overview",
   bom: "overview",
   "route-templates": "overview",
@@ -77,6 +79,8 @@ export function productionRoutes(session: Session) {
         <Route path="orders/new" element={<NewOrder session={session} />} />
         <Route path="orders/:id" element={<OrderPage session={session} />} />
         <Route path="tasks" element={<TaskScreen session={session} />} />
+        <Route path="library" element={<LibraryList session={session} />} />
+        <Route path="library/:id" element={<LibraryPage session={session} />} />
         <Route path="incoming" element={<IncomingScreen session={session} />} />
         <Route path="suppliers" element={<SupplierScreen session={session} />} />
         <Route path="suppliers/:id" element={<SupplierPage session={session} />} />

@@ -42,7 +42,7 @@ const sections = () => {
 };
 
 describe("Production, in the frame", () => {
-  it("opens on Overview, with its six sections in the sidebar and no frame inside the page", async () => {
+  it("opens on Overview, with its seven sections in the sidebar and no frame inside the page", async () => {
     serveProduction("/production");
     render(<App />);
 
@@ -51,6 +51,7 @@ describe("Production, in the frame", () => {
       ["Overview", "/production/overview"],
       ["Orders", "/production/orders"],
       ["Tasks", "/production/tasks"],
+      ["Library", "/production/library"],
       ["Incoming", "/production/incoming"],
       ["Suppliers", "/production/suppliers"],
       ["Stage days", "/production/settings"],

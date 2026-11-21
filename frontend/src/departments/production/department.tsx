@@ -4,7 +4,7 @@ import { productionRoutes } from "./screens/routes";
 /**
  * Production (ADR 0069, 0084, 0085): a department like the others, in the
  * platform's own frame, look and sidebar. Its sections are Overview, Orders,
- * Tasks, Incoming, Suppliers, Payments (owner only) and Stage days; an order and a supplier's page
+ * Tasks, Library (ADR 0087), Incoming, Suppliers, Payments (owner only) and Stage days; an order and a supplier's page
  * show their parent as the current section.
  *
  * `/production/next/*` and the old framed app's pages redirect (see
@@ -20,6 +20,7 @@ export const production: Department = {
     { slug: "overview", label: "Overview", to: "/production/overview" },
     { slug: "orders", label: "Orders", to: "/production/orders" },
     { slug: "tasks", label: "Tasks", to: "/production/tasks" },
+    { slug: "library", label: "Library", to: "/production/library" },
     { slug: "incoming", label: "Incoming", to: "/production/incoming" },
     { slug: "suppliers", label: "Suppliers", to: "/production/suppliers" },
     // Money: only for `production.owner` (the admin and the production manager, ADR 0086).

@@ -34,6 +34,7 @@ from app.modules.production.orders.models import (
     STAGES,
     ProdDelivery,
     ProdDeliverySize,
+    ProdLibraryItem,
     ProdOrder,
     ProdOrderDateChange,
     ProdOrderFile,
@@ -539,6 +540,28 @@ def _printing(db: Session, printing: str, print_supplier_id: str | None, keep: s
     return None
 
 
+#: The details a new order takes from its product's Library record when the
+#: request leaves them out (ADR 0087). Never the COGS: the New order form fills
+#: the target cost from it, where the owner sees it.
+_FROM_LIBRARY = ("colour_code", "fabric_type", "decoration_type", "decoration_width_cm")
+
+
+def _from_library(db: Session, product_id: str | None, data: dict) -> dict:
+    """The request with each detail it left out (absent, null or blank) taken
+    from the product's Library record. What the request gives wins."""
+    if product_id is None:
+        return data
+    item = db.get(ProdLibraryItem, product_id)
+    if item is None:
+        return data
+    filled = dict(data)
+    for key in _FROM_LIBRARY:
+        given = data.get(key)
+        if given is None or (isinstance(given, str) and not given.strip()):
+            filled[key] = getattr(item, key)
+    return filled
+
+
 def create(db: Session, data: dict, actor: UserAccount) -> ProdOrder:
     style = _text(data.get("style_name"), limit=180, what="the style", required=True)
     colour = _text(data.get("colour"), limit=80, what="the colour", required=True)
@@ -552,12 +575,14 @@ def create(db: Session, data: dict, actor: UserAccount) -> ProdOrder:
     if target < today():
         raise Refused("The target date can't be in the past.")
     repeat = bool(data.get("repeat_run"))
+    product_id = _product(db, data.get("shopify_product_id"))
+    data = _from_library(db, product_id, data)
 
     order = ProdOrder(
         code=_next_code(db),
         style_name=style,
         colour=colour,
-        shopify_product_id=_product(db, data.get("shopify_product_id")),
+        shopify_product_id=product_id,
         factory_id=factory.id,
         fabric_bought_by=data["fabric_bought_by"],
         printing=data["printing"],

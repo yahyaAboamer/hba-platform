@@ -20,6 +20,12 @@ Overview (``/overview``): the first tab, read from what the other four screens
 already work out. Read only. Without ``production.owner`` it has no ``owed``,
 no cost problem and no key ending ``_piastres``.
 
+Library (``/library``, ADR 0087): every Shopify product with what HBA types
+about it. Anybody who reads Production reads it; the details and the COGS are
+changed with ``production.owner``, files added and removed with
+``production.edit``. The COGS is money: a product carries ``cogs`` only for
+``production.owner``, and the list carries no amount for anybody.
+
 Refusals follow Operations: ``Refused`` -> 422, ``Locked`` -> 409, an
 unknown order, stage, delivery or file (``NotFound``, and only that) -> 404.
 A refusal rolls back whatever was staged; success commits.
@@ -35,14 +41,14 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.core.permissions import Permission
 from app.db import get_session
 from app.modules.inbox.public import StorageError, file_bucket
 from app.modules.production.orders.guards import EDIT, GUARD, OWNER, SUPPLIERS, too_large  # noqa: F401
-from app.modules.production.orders.services import files, incoming, orders, overview, ratings, tasks
+from app.modules.production.orders.services import files, incoming, library, orders, overview, ratings, tasks
 from app.shared.api.deps import holds
 from app.shared.models.identity import UserAccount
 
@@ -619,6 +625,126 @@ def remove_file(file_id: int, actor: UserAccount = Depends(EDIT), db: Session = 
     except orders.Refused as exc:
         db.rollback()
         raise _refused(exc) from None
+    db.commit()
+    return {"deleted": file_id}
+
+
+# ── Library (ADR 0087) ────────────────────────────────────────────────────────
+
+
+class LibraryEdit(BaseModel):
+    """Only the fields sent are changed; ``null`` or blank clears one."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    colour_code: str | None = Field(default=None, max_length=200)
+    fabric_type: str | None = Field(default=None, max_length=400)
+    decoration_type: str | None = Field(default=None, max_length=400)
+    decoration_width_cm: Decimal | None = Field(default=None, allow_inf_nan=False, max_digits=12)
+    notes: str | None = Field(default=None, max_length=8000)
+    cogs_fabric_piastres: int | None = None
+    cogs_manufacturing_piastres: int | None = None
+    cogs_printing_piastres: int | None = None
+    cogs_accessories_piastres: int | None = None
+    cogs_packaging_piastres: int | None = None
+
+
+@router.get("/library")
+def library_list(db: Session = Depends(get_session)) -> dict:
+    """Every product, active, draft and archived. No money, for anybody."""
+    return {"products": library.listing(db)}
+
+
+@router.get("/library/{pid}")
+def library_product(pid: str, actor: UserAccount = Depends(GUARD), db: Session = Depends(get_session)) -> dict:
+    try:
+        return {"product": library.detail(db, pid, with_money=_money(db, actor))}
+    except orders.NotFound as exc:
+        raise HTTPException(404, str(exc)) from None
+
+
+@router.patch("/library/{pid}")
+def edit_library_product(
+    pid: str, body: LibraryEdit, actor: UserAccount = Depends(OWNER), db: Session = Depends(get_session)
+) -> dict:
+    data = body.model_dump(exclude_unset=True)
+    try:
+        library.update(db, pid, data, actor)
+    except orders.NotFound as exc:
+        db.rollback()
+        raise HTTPException(404, str(exc)) from None
+    except orders.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    return {"product": library.detail(db, pid, with_money=_money(db, actor))}
+
+
+@router.post("/library/{pid}/files", status_code=201)
+async def add_library_file(
+    pid: str, request: Request, actor: UserAccount = Depends(EDIT), db: Session = Depends(get_session)
+) -> dict:
+    """Multipart: ``file`` and ``kind`` (``design`` or ``pattern``, any file;
+    ``size_chart``, a photo or PDF). Refused before reading when too large or
+    of no stated size."""
+    if too_large(request):
+        raise HTTPException(413, "Files must be 20 MB or smaller.")
+    form = await request.form()
+    upload = form.get("file")
+    content = await upload.read() if hasattr(upload, "read") else b""
+    filename = getattr(upload, "filename", None) or ""
+    kind = form.get("kind")
+    kind = kind.strip() if isinstance(kind, str) else None
+
+    def store() -> dict:
+        try:
+            saved = library.add(db, pid, filename=filename, content=content, kind=kind, actor=actor)
+        except orders.NotFound as exc:
+            db.rollback()
+            raise HTTPException(404, str(exc)) from None
+        except orders.Refused as exc:
+            db.rollback()
+            raise _refused(exc) from None
+        except StorageError:
+            db.rollback()
+            logger.exception("A Library file could not be stored")
+            raise HTTPException(503, "The file couldn't be saved. Try again.") from None
+        db.commit()
+        return {"file": saved}
+
+    return await run_in_threadpool(store)
+
+
+@router.get("/library-files/{file_id}")
+def one_library_file(file_id: int, db: Session = Depends(get_session)) -> Response:
+    row = library.for_download(db, file_id)
+    if row is None:
+        raise HTTPException(404, "There is no such file.")
+    try:
+        content = file_bucket().get(row.storage_key)
+    except StorageError:
+        raise HTTPException(404, "There is no such file.") from None
+    return Response(
+        content,
+        media_type=row.mime_type,
+        headers={
+            # A photo or PDF opens in the browser; any other file is only ever
+            # downloaded, never shown.
+            "Content-Disposition": "inline" if row.mime_type != files.OTHER else _attachment(row.name),
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.delete("/library-files/{file_id}")
+def remove_library_file(
+    file_id: int, actor: UserAccount = Depends(EDIT), db: Session = Depends(get_session)
+) -> dict:
+    try:
+        library.remove(db, file_id, actor)
+    except orders.NotFound as exc:
+        db.rollback()
+        raise HTTPException(404, str(exc)) from None
     db.commit()
     return {"deleted": file_id}
 
