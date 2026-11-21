@@ -95,6 +95,14 @@ SOLVED_CHAT = "Was your issue solved? · {order}"
 #: The answers to it, in the order of its two buttons.
 SOLVED_ANSWERS = ("yes", "no")
 
+#: The third approved message (ADR 0087): "we tried to call you", for an
+#: unhappy customer whose 24 hours have closed by the time the second call to
+#: her went unanswered. One detail (the order's name), no buttons. Its words
+#: are Meta's; ``TRIED_CHAT`` is what the chat shows for it.
+TRIED_TEMPLATE = "feedback_tried_to_call"
+TRIED_LANGUAGE = "en"
+TRIED_CHAT = "We tried to call you about your order {order}. Reply here or tell us a good time to call."
+
 #: The one question after a rating is a list of ``(id, built-in title)`` rows.
 #: The ids are what is stored; the titles are what the sheet shows. What she
 #: is *sent* may be an admin's own title (``feedback_messages``).

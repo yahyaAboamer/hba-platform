@@ -22,6 +22,12 @@ message are per round, so a second round can send the message once more.
 Every action locks the survey row first (``lock_open``), so two people
 pressing at once are taken one after the other: the second sees what the
 first did, and the message is queued once.
+
+**The "we tried to call you" message** (``send_tried_to_call``) goes once per
+round: as a chat message if her 24 hours are open when it is sent, otherwise
+as the approved template ``feedback_tried_to_call``. If it cannot go, the
+history says so and tells the team to write to her themselves; it is not
+tried again on its own.
 """
 
 from datetime import datetime, timedelta
@@ -31,9 +37,19 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
-from app.modules.inbox.models import FeedbackFollowUp, FeedbackSurvey
+from app.modules.inbox.models import (
+    FeedbackFollowUp,
+    FeedbackSurvey,
+    InboxConversation,
+    InboxMessage,
+)
+from app.modules.inbox.services import feedback, feedback_messages, outbound, sending
+from app.modules.inbox.services.events import _conversation
+from app.modules.inbox.services.meta import MetaClient, MetaError
+from app.modules.inbox.services.outbound import NotSent, send_text
 from app.shared.services.audit import record_audit
-from app.shared.services.jobs import JobKind, enqueue
+from app.shared.services.jobs import JobKind, PermanentFailure, enqueue
+from app.worker import register_handler
 
 #: The longest a note may be, once trimmed.
 NOTE_MAX = 1000
@@ -48,6 +64,8 @@ REOPEN_WITHIN = timedelta(days=14)
 TOO_LONG = "A note can be at most 1,000 characters."
 NOT_OPEN = "Only a follow-up that is still open can be updated."
 TOO_EARLY = "It can be closed as couldn't reach from the third call with no answer."
+#: What the history says when the message could not go.
+COULD_NOT_SEND = "Couldn't send the WhatsApp message: {why} Write to her yourself."
 
 
 def clean_note(note: str | None, *, required: bool, missing: str) -> str | None:
@@ -251,3 +269,153 @@ def reopen_if_unreached(db: Session, phone: str, at: datetime) -> bool:
     survey.updated_at = utcnow()
     add_entry(db, survey, "wrote_back", at=at)
     return True
+
+
+# ── "We tried to call you" ────────────────────────────────────────────────────
+
+
+def _reference(survey: FeedbackSurvey) -> str:
+    """One per survey and round: what finds the message in the chat."""
+    return f"fbt:{survey.id}:{survey.follow_up_round}"
+
+
+def _settled(db: Session, survey: FeedbackSurvey) -> bool:
+    """Whether this round's message is already accounted for: sent, or
+    failed and told to the team (a failure is not tried again)."""
+    return message_sent(db, survey) or _count(db, survey, "message_failed") > 0
+
+
+def _failed(db: Session, survey: FeedbackSurvey, why: str, now: datetime) -> None:
+    add_entry(db, survey, "message_failed", note=COULD_NOT_SEND.format(why=why)[:NOTE_MAX], at=now)
+
+
+def send_tried_to_call(
+    db: Session,
+    survey_id: int,
+    *,
+    client: MetaClient | None = None,
+    now: datetime | None = None,
+) -> FeedbackSurvey | None:
+    """Tell her we tried to call, once this round: as a chat message if her
+    24 hours are open now, otherwise as the approved template.
+
+    Does nothing unless the follow-up is still open (someone may have reached
+    her, or closed it, since the job was queued) and the message is not yet
+    accounted for. **Sent at most once a round**: the survey row is locked,
+    and a message already in the chat under this round's reference only gets
+    its missing line in the history.
+
+    - A *retryable* Meta error (WhatsApp did not answer) is raised, so the job
+      is tried again; nothing is written.
+    - Anything else that stops it - sending is off, this server may not
+      message her, WhatsApp refused it for good (a template not approved yet,
+      say) - is written in the history, telling the team to write to her.
+    """
+    survey = db.scalar(
+        select(FeedbackSurvey).where(FeedbackSurvey.id == survey_id).with_for_update()
+    )
+    if survey is None or not is_open(survey) or not survey.phone or _settled(db, survey):
+        return survey
+    now = now or utcnow()
+    reference = _reference(survey)
+    already = db.scalar(
+        select(InboxMessage).where(InboxMessage.source_ref == reference).limit(1)
+    )
+    if already is not None:
+        # Sent already; only the history's line of it was lost.
+        if already.status == "failed":
+            _failed(db, survey, already.error or "WhatsApp refused it.", now)
+        else:
+            add_entry(db, survey, "message_sent", note=already.body, at=now)
+        return survey
+    if (why := sending.refusal(db, survey.phone)) is not None:
+        _failed(db, survey, why, now)
+        return survey
+
+    conversation = (
+        db.get(InboxConversation, survey.conversation_id) if survey.conversation_id else None
+    ) or _conversation(db, survey.phone, None)
+    order = survey.order_name or survey.shopify_order_id
+    try:
+        # Her 24 hours are looked at now, not when the call was recorded.
+        if outbound.window_open(conversation, now):
+            words = feedback_messages.text(
+                feedback.get_settings(db), "tried_to_call",
+                name=feedback_messages.first_name(survey), order=order,
+            )
+            message = send_text(
+                db, conversation, words, origin="automatic", source_ref=reference, client=client
+            )
+        else:
+            message = _send_tried_template(db, survey, conversation, reference, client)
+    except NotSent as exc:
+        _failed(db, survey, str(exc), now)
+        return survey
+    if message.status == "failed":
+        _failed(db, survey, message.error or "WhatsApp refused it.", now)
+    else:
+        add_entry(db, survey, "message_sent", note=message.body, at=now)
+    survey.updated_at = now
+    return survey
+
+
+def _send_tried_template(
+    db: Session,
+    survey: FeedbackSurvey,
+    conversation: InboxConversation,
+    reference: str,
+    client: MetaClient | None,
+) -> InboxMessage:
+    """The third approved message, for a customer whose 24 hours have closed.
+    Returns the message as recorded in the chat (``failed`` if WhatsApp refused
+    it for good); a refusal worth retrying is raised."""
+    components = [
+        {"type": "body", "parameters": [{"type": "text", "text": survey.order_name or ""}]}
+    ]
+    owned = client is None
+    client = client or outbound._client(db)
+    try:
+        wa_message_id = client.send_template(
+            conversation.phone, feedback.TRIED_TEMPLATE, feedback.TRIED_LANGUAGE, components
+        )
+        status, error = "sent", None
+    except MetaError as exc:
+        if exc.retryable:
+            raise
+        wa_message_id, status, error = None, "failed", str(exc)
+    finally:
+        if owned:
+            client.close()
+    return outbound.record_outbound(
+        db,
+        conversation,
+        kind="template",
+        body=feedback.TRIED_CHAT.format(order=survey.order_name or survey.shopify_order_id),
+        origin="automatic",
+        status=status,
+        wa_message_id=wa_message_id,
+        error=error,
+        template_name=feedback.TRIED_TEMPLATE,
+        order_id=survey.shopify_order_id,
+        source_ref=reference,
+    )
+
+
+@register_handler(JobKind.INBOX_FEEDBACK_TRIED_TO_CALL)
+def _handle_tried_to_call(db: Session, payload: dict) -> None:
+    survey_id = payload.get("survey_id")
+    if not isinstance(survey_id, int):
+        raise PermanentFailure(
+            f"{JobKind.INBOX_FEEDBACK_TRIED_TO_CALL} requires a survey_id; got payload keys "
+            f"{sorted(payload)!r}"
+        )
+    if not feedback.enabled() and not feedback.is_test_survey(db, survey_id):
+        # Nothing is sent with the feature off (a test aside), and the team
+        # is told, so nobody waits for a message that never went.
+        survey = db.scalar(
+            select(FeedbackSurvey).where(FeedbackSurvey.id == survey_id).with_for_update()
+        )
+        if survey is not None and is_open(survey) and not _settled(db, survey):
+            _failed(db, survey, "feedback is switched off.", utcnow())
+        return
+    send_tried_to_call(db, survey_id)

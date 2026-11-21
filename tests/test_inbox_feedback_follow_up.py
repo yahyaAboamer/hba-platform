@@ -12,19 +12,22 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.businesstime import utcnow
-from app.modules.inbox.models import FeedbackFollowUp, FeedbackSurvey
-from app.modules.inbox.services import chats, feedback_follow_up, feedback_replies
+from app.modules.inbox.models import FeedbackFollowUp, FeedbackSurvey, InboxMessage
+from app.modules.inbox.services import chats, feedback, feedback_follow_up, feedback_replies, outbound
 from app.modules.inbox.services.events import apply_event
 from app.shared.models.audit import AuditEvent
 from app.shared.models.identity import UserAccount
-from app.shared.services.jobs import JobKind
+from app.shared.services.jobs import JobKind, PermanentFailure
 from tests.feedback_support import (  # noqa: F401  (fixtures)
     HER,
     NUMBER_ID,
     connected,
     conversation,
+    feature_on,
     jobs,
+    may_send,
     message,
+    meta,
     survey,
 )
 
@@ -320,3 +323,158 @@ def test_her_typed_message_reopens_it_and_a_tap_does_not(db, connected, staff):
     db.flush()
     db.refresh(row)
     assert row.step == "support" and _kinds(db, row)[-1] == "wrote_back"
+
+
+# ── "We tried to call you" ────────────────────────────────────────────────────
+
+
+def _after_two_calls(db, staff, chat) -> FeedbackSurvey:
+    row = _open(db, conversation_id=chat.id)
+    feedback_follow_up.no_answer(db, row.id, staff, None)
+    feedback_follow_up.no_answer(db, row.id, staff, None)
+    return row
+
+
+def _sent_words(asked) -> list[str]:
+    return [m["text"]["body"] for m in asked if m["type"] == "text"]
+
+
+def test_the_message_goes_as_chat_while_her_24_hours_are_open(db, may_send, staff):
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    asked: list = []
+
+    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+
+    words = "We tried to call you about your order #7001. Reply here or tell us a good time to call."
+    assert _sent_words(asked) == [words]
+    last = _entries(db, row)[-1]
+    assert (last.kind, last.note, last.actor_id) == ("message_sent", words, None)
+    sent = db.scalar(select(InboxMessage).where(InboxMessage.source_ref == f"fbt:{row.id}:0"))
+    assert (sent.kind, sent.status, sent.origin) == ("text", "sent", "automatic")
+    assert row.step == "support"
+
+
+def test_the_template_goes_once_her_24_hours_closed(db, may_send, staff):
+    chat = conversation(db, wrote_ago=timedelta(hours=30))
+    row = _after_two_calls(db, staff, chat)
+    asked: list = []
+
+    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+
+    [body] = asked
+    assert body["type"] == "template"
+    assert (body["template"]["name"], body["template"]["language"]["code"]) == ("feedback_tried_to_call", "en")
+    assert body["template"]["components"] == [
+        {"type": "body", "parameters": [{"type": "text", "text": "#7001"}]}
+    ]
+    sent = db.scalar(select(InboxMessage).where(InboxMessage.source_ref == f"fbt:{row.id}:0"))
+    assert (sent.kind, sent.template_name, sent.shopify_order_id) == ("template", "feedback_tried_to_call", "7001")
+    assert sent.body == feedback.TRIED_CHAT.format(order="#7001")
+    assert _entries(db, row)[-1].kind == "message_sent"
+
+
+def test_the_window_is_checked_when_sending(db, may_send, feature_on, staff, monkeypatch):
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    [(_, _, payload)] = jobs(db, TRIED)
+    # Her 24 hours close before the job runs.
+    chat.last_inbound_at = utcnow() - timedelta(hours=25)
+    db.flush()
+    asked: list = []
+    monkeypatch.setattr(outbound, "_client", lambda _db: meta(asked))
+
+    feedback_follow_up._handle_tried_to_call(db, payload)
+
+    assert [m["type"] for m in asked] == ["template"]
+
+
+def test_running_twice_sends_once(db, may_send, staff):
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    asked: list = []
+
+    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+
+    assert len(asked) == 1
+    assert _kinds(db, row).count("message_sent") == 1
+
+
+def test_a_message_already_in_the_chat_is_not_sent_again(db, may_send, staff):
+    """Sent, but the history's line of it was lost: only the line is added."""
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    outbound.record_outbound(
+        db, chat, kind="text", body="We tried to call you", origin="automatic",
+        status="sent", source_ref=f"fbt:{row.id}:0",
+    )
+    asked: list = []
+
+    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+
+    assert asked == []
+    assert _kinds(db, row)[-1] == "message_sent"
+
+
+def test_a_template_meta_refuses_tells_the_team(db, may_send, staff):
+    chat = conversation(db, wrote_ago=timedelta(hours=30))
+    row = _after_two_calls(db, staff, chat)
+    asked: list = []
+
+    # Not approved yet: Meta refuses it, and asking again would not help.
+    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked, refuse=(404, 132001)))
+
+    last = _entries(db, row)[-1]
+    assert last.kind == "message_failed"
+    assert last.note.startswith("Couldn't send the WhatsApp message:")
+    assert last.note.endswith("Write to her yourself.")
+    assert row.step == "support"
+
+
+def test_sending_off_tells_the_team(db, connected, staff):
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    asked: list = []
+
+    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+
+    assert asked == []
+    last = _entries(db, row)[-1]
+    assert (last.kind, last.note) == (
+        "message_failed",
+        "Couldn't send the WhatsApp message: Sending is turned off in Settings. Write to her yourself.",
+    )
+
+
+def test_feature_off_sends_nothing(db, may_send, staff, monkeypatch):
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    asked: list = []
+    monkeypatch.setattr(outbound, "_client", lambda _db: meta(asked))
+
+    feedback_follow_up._handle_tried_to_call(db, {"survey_id": row.id})
+
+    assert asked == []
+    last = _entries(db, row)[-1]
+    assert (last.kind, last.note) == (
+        "message_failed",
+        "Couldn't send the WhatsApp message: feedback is switched off. Write to her yourself.",
+    )
+
+
+def test_resolved_before_the_job_ran_sends_nothing(db, may_send, feature_on, staff):
+    chat = conversation(db, wrote_ago=timedelta(hours=1))
+    row = _after_two_calls(db, staff, chat)
+    feedback_replies.resolve(db, row.id, staff, "She answered the third time")
+    asked: list = []
+
+    feedback_follow_up.send_tried_to_call(db, row.id, client=meta(asked))
+
+    assert asked == []
+    assert _kinds(db, row)[-1] == "resolved"
+
+
+def test_the_job_needs_a_survey(db):
+    with pytest.raises(PermanentFailure):
+        feedback_follow_up._handle_tried_to_call(db, {})

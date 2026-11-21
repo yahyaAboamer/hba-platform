@@ -59,6 +59,7 @@ from app.modules.inbox.services import events as _inbox_events  # noqa: F401  (r
 from app.modules.inbox.services import feedback as _inbox_feedback  # noqa: F401  (registers handlers)
 from app.modules.inbox.services import feedback_codes as _inbox_feedback_codes  # noqa: F401  (registers handlers)
 from app.modules.inbox.services import feedback_replies as _inbox_feedback_replies  # noqa: F401  (registers handlers)
+from app.modules.inbox.services import feedback_follow_up as _inbox_feedback_follow_up  # noqa: F401  (registers handlers)
 from app.modules.inbox.services import media as _inbox_media  # noqa: F401  (registers handlers)
 from app.modules.inbox.services import outbound as _inbox_outbound  # noqa: F401  (registers handlers)
 from app.modules.inbox.services import payments as _inbox_payments  # noqa: F401  (registers handlers)
