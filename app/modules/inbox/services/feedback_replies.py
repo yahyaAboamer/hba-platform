@@ -37,7 +37,7 @@ from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy import BigInteger, cast, exists, func, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.businesstime import utcnow
@@ -50,6 +50,7 @@ from app.modules.inbox.models import (
 from app.modules.inbox.services import (
     feedback,
     feedback_codes,
+    feedback_follow_up,
     feedback_messages,
     outbound,
     sending,
@@ -167,7 +168,12 @@ def record_tap(
         survey.rating, survey.rated_at, survey.step = tap.value, at, "reason"
     elif tap.step == "reason":
         survey.reason, survey.reason_at = tap.value, at
-        survey.step = "support" if survey.rating == "unhappy" else "comment"
+        if survey.rating == "unhappy":
+            # A person owes her a follow-up: round 0 starts now.
+            survey.step = "support"
+            survey.round_started_at = at
+        else:
+            survey.step = "comment"
     elif tap.step == "solved":
         survey.solved, survey.solved_at = tap.value == "yes", at
         if survey.solved:
@@ -179,6 +185,8 @@ def record_tap(
             survey.resolved_by = None
             survey.reopened_count += 1
             survey.solved_asked_at = None
+            # A new round of follow-up: her calls are counted afresh.
+            feedback_follow_up.start_round(survey, at)
     elif tap.step == "reorder":
         survey.reorder, survey.step = tap.value, "done"
     db.flush()
@@ -430,9 +438,12 @@ def _next_message(
 # ── A person presses Resolved ─────────────────────────────────────────────────
 
 
-def resolve(db: Session, survey_id: int, user: Any, now: datetime | None = None) -> dict:
+def resolve(
+    db: Session, survey_id: int, user: Any, note: str | None, now: datetime | None = None
+) -> dict:
     """A person has followed up an unhappy answer. Only for an unhappy answer
-    waiting for a person.
+    waiting for a person, and only with a note saying what was agreed with
+    her, which goes in the follow-up's history (ADR 0088).
 
     A day later she is asked whether it was solved - unless she has already
     said *No* twice, in which case it is closed without asking again.
@@ -447,9 +458,14 @@ def resolve(db: Session, survey_id: int, user: Any, now: datetime | None = None)
         raise NotFound("No such feedback.")
     if survey.rating != "unhappy" or survey.step != "support":
         raise Refused("Only an unhappy answer waiting for follow-up can be resolved.")
+    # Checked before anything is written.
+    note = feedback_follow_up.clean_note(
+        note, required=True, missing="Write what you agreed with her before resolving."
+    )
 
     now = now or utcnow()
     before = {"step": survey.step, "reopened": survey.reopened_count}
+    feedback_follow_up.add_entry(db, survey, "resolved", note=note, actor_id=user.id, at=now)
     survey.resolved_at = now
     survey.resolved_by = user.id
     survey.updated_at = now
@@ -476,8 +492,7 @@ def resolve(db: Session, survey_id: int, user: Any, now: datetime | None = None)
         after={"step": survey.step, "order": survey.order_name},
     )
     db.flush()
-    names = feedback._names(db, [survey])
-    return feedback.describe(survey, names.get(survey.resolved_by))
+    return feedback_follow_up.describe_one(db, survey)
 
 
 #: What a survey says when the solved question may or may not have gone out.
@@ -533,8 +548,9 @@ def _release_asked(survey_id: int) -> None:
 def back_to_support(survey: FeedbackSurvey, why: str, now: datetime | None = None) -> None:
     """The solved question cannot be (or may not have been) sent, so a person
     has it again: the survey returns to step ``support`` - listed under needs
-    follow-up - with the reason in ``last_error``. Nothing is counted as a
-    reopening: she has not said *No*."""
+    follow-up - with the reason in ``last_error`` and in its history. Nothing
+    is counted as a reopening (she has not said *No*), and it stays in the
+    same round: the calls already made still count."""
     now = now or utcnow()
     survey.step = "support"
     survey.resolved_at = None
@@ -542,6 +558,9 @@ def back_to_support(survey: FeedbackSurvey, why: str, now: datetime | None = Non
     survey.solved_asked_at = None
     survey.last_error = why[:300]
     survey.updated_at = now
+    db = object_session(survey)
+    if db is not None:
+        feedback_follow_up.add_entry(db, survey, "returned", note=why[:feedback_follow_up.NOTE_MAX], at=now)
 
 
 def ask_solved(

@@ -214,3 +214,7 @@ def test_nobody_signed_out_reads_a_chat(fresh_database):
     with TestClient(app) as anonymous:
         assert anonymous.get("/api/inbox/conversations").status_code == 401
         assert anonymous.get("/api/order-ops/whatsapp").status_code == 401
+        # The feedback follow-up list and its actions sit behind the same guard.
+        assert anonymous.get("/api/inbox/feedback/follow-up").status_code == 401
+        for action in ("resolve", "no-answer", "note"):
+            assert anonymous.post(f"/api/inbox/feedback/1/{action}", json={"note": "x"}).status_code == 401

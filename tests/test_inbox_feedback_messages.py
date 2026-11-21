@@ -256,6 +256,23 @@ def test_a_placeholder_a_message_cannot_use_is_refused_in_plain_words():
     assert "{nmae} cannot be used here" in feedback_messages.validate({"thanks.loved": "Hi {nmae}"})["thanks.loved"]
 
 
+def test_tried_to_call_words_are_editable_and_take_the_order(db):
+    """The message after the second unanswered call (ADR 0088) names the order."""
+    item = feedback_messages.BY_KEY["tried_to_call"]
+    assert (item.group, item.kind, item.placeholders) == ("unhappy", "text", ("name", "order"))
+    assert item.default == (
+        "We tried to call you about your order {order}. Reply here or tell us a good time to call."
+    )
+    assert feedback_messages.validate({"tried_to_call": "Hi {name}, about {order}"}) == {}
+    assert feedback_messages.validate({"tried_to_call": "Your code {code}"})["tried_to_call"] == (
+        "{code} cannot be used here; this message can use {name} and {order}."
+    )
+    saved = feedback_messages.save(
+        db, {"tried_to_call": "Hi {name}, about {order}"}, actor_id=None, actor_email=None
+    )
+    assert feedback_messages.text(saved, "tried_to_call", name="Nour", order="#7001") == "Hi Nour, about #7001"
+
+
 def test_blank_is_the_built_in_words_not_an_error():
     assert feedback_messages.validate({"thanks.loved": "", "invitation": "   ", "tell_us": None}) == {}
 
@@ -439,7 +456,7 @@ def test_the_unhappy_path_to_the_end_says_the_edited_words_in_every_message(db, 
     tap_list(db, row, "wrong_item", "wamid.U2")
     assert _bodies(world.asked)[-1] == "Sorry Yahya. We reply in 24 hours."
 
-    feedback_replies.resolve(db, row.id, world.owner)
+    feedback_replies.resolve(db, row.id, world.owner, "Agreed an exchange")
     feedback_replies._handle_ask_solved(db, {"survey_id": row.id})
     asked = world.asked[-1]
     assert asked["interactive"]["body"] == {"text": "Did we fix it?"}
@@ -484,7 +501,7 @@ def test_the_approved_message_keeps_its_own_buttons_whatever_the_chat_ones_say(d
     row = the_test(db)
     tap_rating(db, row, "unhappy", "wamid.U1")
     tap_list(db, row, "size_fit", "wamid.U2")
-    feedback_replies.resolve(db, row.id, world.owner)
+    feedback_replies.resolve(db, row.id, world.owner, "Agreed an exchange")
     db.get(InboxConversation, row.conversation_id).last_inbound_at = utcnow() - timedelta(hours=30)
     db.flush()
     feedback_replies._handle_ask_solved(db, {"survey_id": row.id})
@@ -514,7 +531,7 @@ def _not_solved(db, world, *, wamid="wamid.U3", before_tap=lambda: None):
     row = the_test(db)
     tap_rating(db, row, "unhappy", "wamid.U1")
     tap_list(db, row, "size_fit", "wamid.U2")
-    feedback_replies.resolve(db, row.id, world.owner)
+    feedback_replies.resolve(db, row.id, world.owner, "Agreed an exchange")
     feedback_replies._handle_ask_solved(db, {"survey_id": row.id})
     asked_before = len(world.asked)
     before_tap()
@@ -616,11 +633,15 @@ def test_reading_gives_the_editor_everything_and_writes_nothing(client):
     assert [(t["name"], t["buttons"]) for t in body["templates"]] == [
         ("order_feedback", ["Loved it", "It was okay", "Not happy"]),
         ("feedback_resolved", ["Yes", "No"]),
+        ("feedback_tried_to_call", []),
     ]
     assert body["templates"][0]["body"] == (
         "Hi {{1}}, your HBA Wear order {{2}} has been delivered. How was it? Tap an answer below."
     )
     assert body["templates"][1]["body"] == "About your HBA Wear order {{1}}: was your issue solved?"
+    assert body["templates"][2]["body"] == (
+        "We tried to call you about your order {{1}}. Reply here or tell us a good time to call."
+    )
     assert all("Meta" in t["note"] for t in body["templates"])
     # Reading never writes the settings row.
     with SessionLocal() as db:
@@ -655,6 +676,8 @@ def test_the_paths_only_point_at_messages_and_templates_that_exist(client):
     unhappy = [s["ref"] for s in body["flows"]["unhappy"]]
     assert unhappy.index("solved_question") < unhappy.index("feedback_resolved") < unhappy.index("not_solved")
     assert unhappy.index("not_solved") < unhappy.index("reorder_question") < unhappy.index("thanks.unhappy")
+    assert unhappy.index("support") < unhappy.index("tried_to_call") < unhappy.index("feedback_tried_to_call")
+    assert unhappy.index("feedback_tried_to_call") < unhappy.index("solved_question")
     # Every editable message that is not an option or a button is on some path.
     on_a_path = {s["ref"] for steps in body["flows"].values() for s in steps} | {
         s["button"] for steps in body["flows"].values() for s in steps if s["button"]

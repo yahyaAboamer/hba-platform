@@ -24,6 +24,7 @@ from app.modules.production.orders.models import ProdSupplierEntry
 from app.modules.production.orders.services import account
 from app.modules.production.orders.services import suppliers as service
 from app.shared.models.audit import AuditEvent
+from tests.conftest import alembic_head
 from tests.test_prod_orders import (  # noqa: F401  (fixtures)
     FIRST,
     FIX,
@@ -276,7 +277,7 @@ def test_the_downgrade_refuses_while_a_purchase_or_a_line_exists(owner):
     with pytest.raises(RuntimeError, match="purchase"):
         command.downgrade(Config("alembic.ini"), "a7c4e9f20034")
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "a7c3e9d10040"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == alembic_head()
         assert connection.execute(text("SELECT count(*) FROM prod_supplier_entry")).scalar_one() == 1
 
 

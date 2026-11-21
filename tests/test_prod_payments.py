@@ -8,6 +8,7 @@ from sqlalchemy import select, text
 from app.db import SessionLocal, engine
 from app.modules.production.orders.services import suppliers as supplier_service
 from app.shared.models.audit import AuditEvent
+from tests.conftest import alembic_head
 from tests.test_prod_orders import (  # noqa: F401  (fixtures)
     PNG,
     TODAY,
@@ -213,4 +214,4 @@ def test_the_downgrade_refuses_while_a_payment_holds_more_than_one_photo(owner, 
     with pytest.raises(RuntimeError, match="more than one photo"):
         command.downgrade(Config("alembic.ini"), "e5b9a3d70038")
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "a7c3e9d10040"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == alembic_head()

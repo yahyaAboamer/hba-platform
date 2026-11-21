@@ -27,6 +27,7 @@ from app.modules.production.orders.services import orders as service
 from app.shared.models.audit import AuditEvent
 from app.shared.models.catalogue import Product
 from app.shared.models.identity import UserAccount
+from tests.conftest import alembic_head
 
 PASSWORD = "quiet-harbour-lantern"
 BOOTSTRAP = {"email": "owner@example.com", "display_name": "Owner", "password": PASSWORD}
@@ -1383,8 +1384,8 @@ def test_the_downgrade_refuses_while_an_order_exists(owner):
         command.downgrade(Config("alembic.ini"), "e5a2c7d90032")
     with engine.connect() as connection:
         # The whole downgrade is one transaction, so a refusal leaves the database at the head
-        # (`a7c3e9d10040`, then `f1c2d3e40039`, `e5b9a3d70038` and batch 6b's `d4a8f2c60037`, whose downgrades ran first and were rolled back with it).
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "a7c3e9d10040"
+        # (`f1c2d3e40039`, then `e5b9a3d70038` and batch 6b's `d4a8f2c60037`, whose downgrades ran first and were rolled back with it).
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == alembic_head()
         assert connection.execute(text("SELECT count(*) FROM prod_order")).scalar_one() == 1
 
 

@@ -1,70 +1,55 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { ApiError, api } from "../../lib/api";
 import { RATING_WORDS, REORDER_WORDS, dayTimeLabel, feedbackStateNote } from "../../lib/inbox";
-import type { ChatFeedback } from "../../lib/inbox";
+import type { ChatFeedback, FeedbackRow } from "../../lib/inbox";
 import { dayMonth } from "../../components/OpsSource";
+import { FollowUpActions, FollowUpHistory, WaitingClock } from "./FollowUp";
 
 /**
  * How her delivered order went, in her own words, beside her chat
- * (ADR 0083, decision 4).
+ * (ADR 0083, decision 4; ADR 0088).
  *
- * An unhappy answer is followed up by a person: the one who has written to
- * her presses *Resolved*, and a day later she is asked whether it was solved.
- * Pressing it changes nothing about the order. It does not apologise or
- * refund; it only tells the platform a person has been in touch.
+ * An unhappy answer is followed up by a person, who records what happened:
+ * a call she did not answer, a note, or *Resolved* with what was agreed. A day
+ * after *Resolved* she is asked whether it was solved. None of it changes the
+ * order. It does not apologise or refund; it tells the platform, and the next
+ * person, what has been done.
  */
-
-/** Who pressed it and when, as soon as the press is in, before the chat is read again. */
-type JustResolved = { by: string | null; at: string };
 
 function resolvedWords(by: string | null, at: string): string {
   return by ? `Resolved by ${by} on ${dayMonth(at)}` : `Resolved on ${dayMonth(at)}`;
+}
+
+function unreachedWords(by: string | null, at: string): string {
+  return by ? `Closed as couldn't reach by ${by} on ${dayMonth(at)}` : `Closed as couldn't reach on ${dayMonth(at)}`;
 }
 
 export function ChatFeedbackBlock({
   feedback,
   now,
   late,
-  onResolved,
+  onChanged,
 }: {
   feedback: ChatFeedback;
   now: number;
   /** Not the first thing in the panel: nothing waits on a person. */
   late: boolean;
   /** Read the chat and the list again. */
-  onResolved: () => void;
+  onChanged: () => void;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [just, setJust] = useState<JustResolved | null>(null);
+  // The server's answer to the last action, shown at once until the chat is read again.
+  const [latest, setLatest] = useState<FeedbackRow | null>(null);
+  useEffect(() => setLatest(null), [feedback]);
+  const view: ChatFeedback = latest && latest.id === feedback.id ? { ...feedback, ...latest } : feedback;
 
-  const waiting = feedback.rating === "unhappy" && feedback.step === "support" && feedback.needs_follow_up;
-  const canResolve = waiting && just === null;
-  // What the server says wins once it says it; until then, what was pressed.
-  const resolved: JustResolved | null =
-    feedback.resolved_at && !feedback.needs_follow_up
-      ? { by: feedback.resolved_by_name, at: feedback.resolved_at }
-      : just;
-  const note = feedbackStateNote(feedback.state);
+  const waiting = view.rating === "unhappy" && view.step === "support" && view.needs_follow_up;
+  const resolved = view.resolved_at && !view.needs_follow_up ? { by: view.resolved_by_name, at: view.resolved_at } : null;
+  const history = view.history ?? [];
+  const note = feedbackStateNote(view.state);
 
-  async function resolve() {
-    setBusy(true);
-    setProblem(null);
-    // Shown at once; taken back below if the platform refuses.
-    setJust({ by: null, at: new Date().toISOString() });
-    try {
-      const done = await api.post<{ resolved_by_name?: string | null; resolved_at?: string | null }>(
-        `/api/inbox/feedback/${feedback.id}/resolve`,
-      );
-      setJust({ by: done?.resolved_by_name ?? null, at: done?.resolved_at ?? new Date().toISOString() });
-      onResolved();
-    } catch (error) {
-      setJust(null);
-      setProblem(error instanceof ApiError ? error.message : "That could not be saved.");
-    } finally {
-      setBusy(false);
-    }
+  function done(updated: FeedbackRow) {
+    setLatest(updated);
+    onChanged();
   }
 
   return (
@@ -73,7 +58,7 @@ export function ChatFeedbackBlock({
       aria-labelledby="inbox-feedback-title"
     >
       <h3 id="inbox-feedback-title">Feedback</h3>
-      {feedback.is_test && (
+      {view.is_test && (
         <p className="inbox-order__hint">
           <span className="inbox-status inbox-status--plain">Test</span> Sent from Settings to try the
           questions. Not counted.
@@ -81,91 +66,102 @@ export function ChatFeedbackBlock({
       )}
       <dl>
         <dt>Order</dt>
-        <dd className="num">{feedback.order_name ?? "—"}</dd>
+        <dd className="num">{view.order_name ?? "—"}</dd>
         <dt>Asked</dt>
-        <dd className="num">{feedback.asked_at ? dayTimeLabel(feedback.asked_at, now) : "—"}</dd>
+        <dd className="num">{view.asked_at ? dayTimeLabel(view.asked_at, now) : "—"}</dd>
         <dt>Answer</dt>
         <dd>
-          {feedback.rating ? (
+          {view.rating ? (
             <span
               className={`inbox-status inbox-status--${
-                feedback.rating === "loved" ? "settled" : feedback.rating === "unhappy" ? "refused" : "plain"
+                view.rating === "loved" ? "settled" : view.rating === "unhappy" ? "refused" : "plain"
               }`}
             >
-              {RATING_WORDS[feedback.rating]}
+              {RATING_WORDS[view.rating]}
             </span>
           ) : (
             <span className="ops-muted">No answer yet</span>
           )}
         </dd>
-        {feedback.reason_title && (
+        {view.reason_title && (
           <>
             <dt>Reason</dt>
-            <dd>{feedback.reason_title}</dd>
+            <dd>{view.reason_title}</dd>
           </>
         )}
-        {feedback.comment && (
+        {view.comment && (
           <>
             <dt>She wrote</dt>
             <dd className="inbox-fb-block__said" dir="auto">
-              {feedback.comment}
+              {view.comment}
             </dd>
           </>
         )}
-        {feedback.reorder && (
+        {view.reorder && (
           <>
             <dt>Order again</dt>
-            <dd>{REORDER_WORDS[feedback.reorder]}</dd>
+            <dd>{REORDER_WORDS[view.reorder]}</dd>
           </>
         )}
-        {feedback.code && (
+        {view.code && (
           <>
             <dt>Reward code</dt>
             <dd>
-              <span className="num">{feedback.code}</span> · {feedback.code_used ? "used" : "not used yet"}
+              <span className="num">{view.code}</span> · {view.code_used ? "used" : "not used yet"}
             </dd>
           </>
         )}
       </dl>
 
-      {waiting && !resolved && (
+      {waiting && view.reply_hours > 0 && view.waiting_since && (
+        <p className="inbox-order__why">
+          <WaitingClock since={view.waiting_since} hours={view.reply_hours} now={now} />
+        </p>
+      )}
+      {waiting && (
         <p className="inbox-order__hint">
           <span className="inbox-status inbox-status--owed">Needs follow-up</span>
         </p>
       )}
-      {feedback.reopened_count > 0 && (
+      {view.reopened_count > 0 && (
         <p className="inbox-order__why">
           Reopened: she said her issue was not solved
-          {feedback.reopened_count > 1 ? ` (${feedback.reopened_count} times)` : ""}.
+          {view.reopened_count > 1 ? ` (${view.reopened_count} times)` : ""}.
         </p>
       )}
       {resolved && <p className="inbox-order__why">{resolvedWords(resolved.by, resolved.at)}.</p>}
-      {feedback.solved !== null && (
-        <p className="inbox-order__why">Solved: {feedback.solved ? "yes" : "no"}</p>
+      {view.unreached_at && !waiting && (
+        <p className="inbox-order__why">{unreachedWords(view.unreached_by_name, view.unreached_at)}.</p>
+      )}
+      {view.solved !== null && (
+        <p className="inbox-order__why">Solved: {view.solved ? "yes" : "no"}</p>
       )}
       {note && <p className="inbox-order__hint">{note}.</p>}
       {/* The platform's own sentence ("The question … could not be sent: …"), so nothing is put in front of it. */}
-      {feedback.last_error && <p className="inbox-order__hint">{feedback.last_error}</p>}
+      {view.last_error && <p className="inbox-order__hint">{view.last_error}</p>}
 
-      {canResolve && (
+      {history.length > 0 && (
         <>
-          <p className="inbox-order__hint">She will be asked tomorrow whether her issue was solved.</p>
-          <div className="inbox-setstatus">
-            <button
-              type="button"
-              className="inbox-btn inbox-btn--small"
-              disabled={busy}
-              onClick={() => void resolve()}
-            >
-              {busy ? "Saving…" : "Resolved"}
-            </button>
-          </div>
+          <h4 className="inbox-fu-heading">Follow-up</h4>
+          <FollowUpHistory entries={history} />
         </>
       )}
-      {problem && (
-        <p className="notice notice--refused" role="alert">
-          {problem}
-        </p>
+      {waiting && (
+        <FollowUpActions
+          survey={{
+            id: view.id,
+            order_name: view.order_name,
+            rating: view.rating,
+            reason_title: view.reason_title,
+            no_answer_count: view.no_answer_count ?? 0,
+            message_sent: view.message_sent ?? false,
+            reopened_count: view.reopened_count,
+            tried_to_call_text: view.tried_to_call_text ?? null,
+            // An administrator's test is sent even with the switch off.
+            feedback_off: view.enabled === false && !view.is_test,
+          }}
+          onDone={done}
+        />
       )}
     </section>
   );

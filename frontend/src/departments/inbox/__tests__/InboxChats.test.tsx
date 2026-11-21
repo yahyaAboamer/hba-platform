@@ -997,14 +997,59 @@ describe("delivery feedback beside the chat", () => {
     // Her own words, in whatever script she wrote: read in their own direction.
     expect(fb.getByText("Too small").getAttribute("dir")).toBe("auto");
     expect(fb.getByText("Needs follow-up")).toBeTruthy();
-    expect(fb.getByText("She will be asked tomorrow whether her issue was solved.")).toBeTruthy();
-    expect(fb.getByRole("button", { name: "Resolved" })).toBeTruthy();
+    // What she will be sent is said in the pop-up, before anything is saved.
+    expect(fb.queryByText("She will be asked tomorrow whether her issue was solved.")).toBeNull();
+    expect(fb.getByRole("button", { name: "Resolved…" })).toBeTruthy();
+    expect(fb.getByRole("button", { name: "No answer" })).toBeTruthy();
+    expect(fb.getByRole("button", { name: "Add note" })).toBeTruthy();
     // A person needs to act on it: it comes before the order.
     const headings = within(await panel())
       .getAllByRole("heading", { level: 3 })
       .map((heading) => heading.textContent);
     expect(headings[0]).toBe("Feedback");
     expect(headings[1]).toBe("Order");
+  });
+
+  it("its pop-ups say what the server will really do", async () => {
+    serve({
+      detail: {
+        feedback: feedback({
+          reopened_count: 2,
+          no_answer_count: 1,
+          message_sent: false,
+          enabled: true,
+          tried_to_call_text: "We tried to call you about your order #7002.",
+          history: [],
+        }),
+      },
+    });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    fireEvent.click(fb.getByRole("button", { name: "Resolved…" }));
+    expect(screen.getByRole("dialog").textContent).toContain(
+      "This closes the follow-up. She has said it wasn't solved twice, so she won't be asked again.",
+    );
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(fb.getByRole("button", { name: "No answer" }));
+    expect(screen.getByRole("dialog").textContent).toContain(
+        `she'll get a WhatsApp message from the platform: "We tried to call you about your order #7002."`,
+    );
+  });
+
+  it("with feedback switched off, the second call promises no message", async () => {
+    serve({
+      detail: {
+        feedback: feedback({ no_answer_count: 1, message_sent: false, enabled: false, history: [] }),
+      },
+    });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    fireEvent.click(fb.getByRole("button", { name: "No answer" }));
+    expect(screen.getByRole("dialog").textContent).toContain(
+      "Feedback messages are switched off, so nothing will be sent to her.",
+    );
   });
 
   it("tags a test, which is a real survey in every other way: Resolved works", async () => {
@@ -1015,7 +1060,7 @@ describe("delivery feedback beside the chat", () => {
     expect(fb.getByText("Test")).toBeTruthy();
     expect(fb.getByText("TEST")).toBeTruthy();
     expect(fb.getByText(/Not counted/)).toBeTruthy();
-    expect(fb.getByRole("button", { name: "Resolved" })).toBeTruthy();
+    expect(fb.getByRole("button", { name: "Resolved…" })).toBeTruthy();
   });
 
   it("does not tag a customer's own answer as a test", async () => {
@@ -1049,7 +1094,7 @@ describe("delivery feedback beside the chat", () => {
     expect(fb.getByText("Loved it")).toBeTruthy();
     expect(fb.getByText("Maybe")).toBeTruthy();
     expect(fb.getByText("THANKS-4F7K").parentElement?.textContent).toContain("used");
-    expect(fb.queryByRole("button", { name: "Resolved" })).toBeNull();
+    expect(fb.queryByRole("button", { name: "Resolved…" })).toBeNull();
     const headings = within(await panel())
       .getAllByRole("heading", { level: 3 })
       .map((heading) => heading.textContent);
@@ -1061,63 +1106,142 @@ describe("delivery feedback beside the chat", () => {
       { step: "reorder", needs_follow_up: false, resolved_at: minutesAgo(60), resolved_by_name: "Mariam" },
       { rating: "okay", step: "done", needs_follow_up: false },
       { rating: null, step: "rating", needs_follow_up: false },
+      { step: "done", needs_follow_up: false, unreached_at: "2026-11-21T08:40:00+00:00", unreached_by_name: "Mona" },
     ]) {
       serve({ detail: { feedback: feedback(extra) } });
       show("/inbox/chats/12");
       const fb = await block();
-      expect(fb.queryByRole("button", { name: "Resolved" })).toBeNull();
+      expect(fb.queryByRole("button", { name: "Resolved…" })).toBeNull();
+      expect(fb.queryByRole("button", { name: "No answer" })).toBeNull();
+      expect(fb.queryByRole("button", { name: "Add note" })).toBeNull();
       cleanup();
     }
   });
 
-  it("marks it resolved at once, then reads the chat and the list again", async () => {
+  it("resolves with what was agreed, shows it at once, then reads the chat and the list again", async () => {
     const waiting = feedback();
+    const resolved = {
+      needs_follow_up: false,
+      step: "reorder",
+      follow_up_state: "resolved",
+      resolved_at: "2026-11-12T10:00:00+00:00",
+      resolved_by_name: "Owner",
+    };
     serve({
       detail: { feedback: waiting },
       post: (url) => {
         if (url !== "/api/inbox/feedback/2/resolve") return [404, { detail: "No" }];
-        Object.assign(waiting, {
-          needs_follow_up: false,
-          resolved_at: "2026-11-12T10:00:00+00:00",
-          resolved_by_name: "Owner",
-        });
-        return [200, { id: 2, resolved_at: "2026-11-12T10:00:00+00:00", resolved_by_name: "Owner" }];
+        Object.assign(waiting, resolved);
+        return [200, { ...feedback(), id: 2, ...resolved }];
       },
     });
     show("/inbox/chats/12");
     const fb = await block();
     await screen.findByRole("link", { name: /Nour Adel/ });
 
-    fireEvent.click(fb.getByRole("button", { name: "Resolved" }));
+    fireEvent.click(fb.getByRole("button", { name: "Resolved…" }));
+    const dialog = screen.getByRole("dialog", { name: "Resolve #7002" });
+    fireEvent.change(within(dialog).getByLabelText(/What did you agree with her\?/), {
+      target: { value: "Exchange to L" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save and resolve" }));
 
     // Once the chat is read again the block moves below the order, so look it up afresh.
     const here = within(await panel());
     expect(await here.findByText("Resolved by Owner on 12 Nov.")).toBeTruthy();
-    expect(posts()[0]).toMatchObject({ url: "/api/inbox/feedback/2/resolve" });
-    expect(here.queryByRole("button", { name: "Resolved" })).toBeNull();
-    expect(here.queryByText("She will be asked tomorrow whether her issue was solved.")).toBeNull();
+    expect(posts()[0]).toMatchObject({ url: "/api/inbox/feedback/2/resolve", body: { note: "Exchange to L" } });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(here.queryByRole("button", { name: "Resolved…" })).toBeNull();
     expect(here.queryByText("Needs follow-up")).toBeNull();
     const after = () => calls.slice(calls.findIndex((call) => call.method === "POST") + 1);
     await waitFor(() => expect(after().some((call) => /\/conversations\/12$/.test(call.url))).toBe(true));
     await waitFor(() => expect(after().some((call) => call.url === "/api/inbox/conversations")).toBe(true));
   });
 
-  it("gives the server's reason, and offers the button again, when it refuses", async () => {
+  it("gives the server's reason in the pop-up, keeps the note, and leaves it waiting", async () => {
     serve({
       detail: { feedback: feedback() },
-      post: () => [422, { detail: "Only an unhappy answer that is waiting can be resolved." }],
+      post: () => [422, { detail: "Only a follow-up that is still open can be updated." }],
     });
     show("/inbox/chats/12");
     const fb = await block();
 
-    fireEvent.click(fb.getByRole("button", { name: "Resolved" }));
+    fireEvent.click(fb.getByRole("button", { name: "Resolved…" }));
+    const dialog = screen.getByRole("dialog");
+    const note = within(dialog).getByLabelText(/What did you agree with her\?/) as HTMLTextAreaElement;
+    fireEvent.change(note, { target: { value: "Exchange to L" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save and resolve" }));
 
-    expect((await fb.findByRole("alert")).textContent).toBe(
-      "Only an unhappy answer that is waiting can be resolved.",
+    expect((await within(dialog).findByRole("alert")).textContent).toBe(
+      "Only a follow-up that is still open can be updated.",
     );
-    expect(fb.getByRole("button", { name: "Resolved" })).toBeTruthy();
+    expect(note.value).toBe("Exchange to L");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(fb.getByRole("button", { name: "Resolved…" })).toBeTruthy();
     expect(fb.getByText("Needs follow-up")).toBeTruthy();
     expect(fb.queryByText(/^Resolved by|^Resolved on/)).toBeNull();
+  });
+
+  it("shows how long she has waited and what has been done", async () => {
+    serve({
+      detail: {
+        feedback: feedback({
+          reply_hours: 24,
+          waiting_since: minutesAgo(27 * 60),
+          no_answer_count: 2,
+          message_sent: true,
+          history: [
+            { id: 1, round: 0, kind: "no_answer", note: null, at: "2026-11-20T12:05:00+00:00", by_name: "Mona" },
+            {
+              id: 2,
+              round: 0,
+              kind: "no_answer",
+              note: "Phone switched off",
+              at: "2026-11-21T08:40:00+00:00",
+              by_name: "Mona",
+            },
+            { id: 3, round: 0, kind: "message_sent", note: null, at: "2026-11-21T08:40:00+00:00", by_name: null },
+          ],
+        }),
+      },
+    });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    expect(fb.getByText("Waiting 27 h · past the 24 h promise")).toBeTruthy();
+    expect(fb.getByRole("heading", { name: "Follow-up" })).toBeTruthy();
+    const lines = fb.getAllByRole("listitem").map((line) => line.textContent);
+    expect(lines).toEqual([
+      "No answer · Mona · 20 Nov 14:05",
+      "No answer · Mona · 21 Nov 10:40Phone switched off",
+      "WhatsApp sent by the platform · 21 Nov 10:40",
+    ]);
+
+    // The third call: the message has gone, and it can be closed.
+    fireEvent.click(fb.getByRole("button", { name: "No answer" }));
+    const dialog = screen.getByRole("dialog", { name: "No answer: #7002" });
+    expect(within(dialog).getByText("This is call 3")).toBeTruthy();
+    expect(within(dialog).getByText("She has already been sent the WhatsApp message.")).toBeTruthy();
+    expect((within(dialog).getByRole("checkbox") as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("says who closed it as couldn't reach, and when", async () => {
+    serve({
+      detail: {
+        feedback: feedback({
+          step: "done",
+          needs_follow_up: false,
+          follow_up_state: "unreached",
+          unreached_at: "2026-11-21T08:40:00+00:00",
+          unreached_by_name: "Mona",
+        }),
+      },
+    });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    expect(fb.getByText("Closed as couldn't reach by Mona on 21 Nov.")).toBeTruthy();
+    expect(fb.queryByText("Needs follow-up")).toBeNull();
   });
 
   it("says she said it was not solved, and what happened to the last message", async () => {
@@ -1140,7 +1264,7 @@ describe("delivery feedback beside the chat", () => {
     expect(fb.getByText("WhatsApp was not answering")).toBeTruthy();
     expect(fb.getByText("Could not be sent.")).toBeTruthy();
     // Waiting on a person again.
-    expect(fb.getByRole("button", { name: "Resolved" })).toBeTruthy();
+    expect(fb.getByRole("button", { name: "Resolved…" })).toBeTruthy();
   });
 
   it("says who resolved it, and whether it turned out solved", async () => {

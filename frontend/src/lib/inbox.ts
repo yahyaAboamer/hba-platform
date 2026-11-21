@@ -159,7 +159,11 @@ export type ChatFeedback = {
   code_used: boolean;
   /** An administrator's test (`POST /api/inbox/feedback/test`), not a customer's answer. */
   is_test?: boolean;
-};
+  /** The hours support promises to reach her within (Feedback setup). */
+  reply_hours: number;
+  /** Whether feedback messages are being sent at all (the feature's switch on the server). */
+  enabled?: boolean;
+} & FollowUpFields;
 
 export type ConversationDetail = Conversation & {
   orders: ChatOrder[];
@@ -259,7 +263,53 @@ export function totalLabel(total: string | null): string {
 export type FeedbackRating = "loved" | "okay" | "unhappy";
 export type FeedbackReorder = "very_likely" | "maybe" | "unlikely";
 export type FeedbackStep = "rating" | "reason" | "comment" | "support" | "solved" | "reorder" | "done";
-export type FeedbackFollowUp = "needs_follow_up" | "resolved" | "reopened";
+export type FeedbackFollowUp = "needs_follow_up" | "resolved" | "reopened" | "unreached";
+
+// ── A follow-up's record (ADR 0088; services/feedback_follow_up.py) ────────
+
+/** What one history entry records. `message_*`, `wrote_back` and `returned` are the platform's own. */
+export type FollowUpKind =
+  | "no_answer"
+  | "note"
+  | "resolved"
+  | "unreached"
+  | "message_sent"
+  | "message_failed"
+  | "wrote_back"
+  | "returned";
+
+/** One thing done on a follow-up. Never edited or deleted; a mistake is corrected by a new note. */
+export type FollowUpEntry = {
+  id: number;
+  round: number;
+  kind: FollowUpKind;
+  note: string | null;
+  at: string;
+  /** Who did it; null for the platform. */
+  by_name: string | null;
+};
+
+/** Where a follow-up stands, as `feedback.describe` sends it with every survey. */
+export type FollowUpFields = {
+  /** Oldest first, every round. */
+  history: FollowUpEntry[];
+  /** Calls with no answer in this round. */
+  no_answer_count: number;
+  /** Whether this round's "we tried to call you" message went. */
+  message_sent: boolean;
+  /** When this round started; the waiting clock runs from here. */
+  waiting_since: string | null;
+  unreached_at: string | null;
+  unreached_by_name: string | null;
+  follow_up_round: number;
+  follow_up_state: "needs_follow_up" | "resolved" | "unreached" | null;
+  /**
+   * The words she would get after the 2nd call with no answer, as the server
+   * would send them now; null once this round's message is accounted for, or
+   * when the follow-up is not open.
+   */
+  tried_to_call_text?: string | null;
+};
 
 /** What her answer is called on screen. */
 export const RATING_WORDS: Record<FeedbackRating, string> = {
@@ -299,7 +349,7 @@ export function feedbackStateNote(state: string): string | null {
 }
 
 /** One asked order, as a row of the Feedback sheet. */
-export type FeedbackRow = {
+export type FeedbackRow = FollowUpFields & {
   id: number;
   order_id: string;
   order_name: string | null;
@@ -333,6 +383,8 @@ export type FeedbackRow = {
   code_expires_at: string | null;
   code_used_at: string | null;
   code_order_name: string | null;
+  /** Her chat, for *Open chat*; null when there is none yet. */
+  conversation_id?: number | null;
 };
 
 /** The numbers for the sheet's current filters. */
@@ -346,7 +398,12 @@ export type FeedbackSummary = {
   okay: number;
   unhappy: number;
   needs_follow_up: number;
+  /** Open, and waiting longer than the promised hours. */
+  overdue: number;
+  unreached: number;
   solved: number;
+  /** How many were asked "Was your issue solved?" (answered or not). */
+  solved_asked: number;
   codes_sent: number;
   codes_used: number;
 };
@@ -368,6 +425,12 @@ export type FeedbackPage = {
   options: FeedbackOptions;
   /** Whether the questions are being sent at all (the feature's switch on the server). */
   enabled: boolean;
+};
+
+/** Every open follow-up, longest waiting first (`GET /api/inbox/feedback/follow-up`). */
+export type FollowUpListPage = {
+  rows: FeedbackRow[];
+  reply_hours: number;
 };
 
 /** What a test send answers (`POST /api/inbox/feedback/test`). */

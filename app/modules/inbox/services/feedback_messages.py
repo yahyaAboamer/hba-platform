@@ -9,8 +9,8 @@ code reads any of it.
 
 What cannot be changed here, and why:
 
-- **The two approved messages** (``order_feedback`` and ``feedback_resolved``)
-  are held by Meta; their words change only in Meta's WhatsApp Manager and
+- **The approved messages** (``order_feedback``, ``feedback_resolved`` and
+  ``feedback_tried_to_call``) are held by Meta; their words change only in Meta's WhatsApp Manager and
   need Meta's approval again. They are shown (``TEMPLATES``), not editable.
 - **What an option records.** An option's id is fixed (it is what is stored
   and what the Feedback sheet filters by); only its title, the words she
@@ -64,6 +64,7 @@ PLACEHOLDERS: dict[str, tuple[str, str]] = {
     "percent": ("The discount, in percent", str(feedback.DISCOUNT_PERCENT)),
     "days": ("How many days her code lasts", str(feedback.CODE_DAYS)),
     "hours": ("The hours promised for a reply", "24"),
+    "order": ("The order's name", "#1234"),
     "url": ("Your review link", "https://example.com/review"),
 }
 #: What a missing required placeholder costs, in words for the owner.
@@ -78,6 +79,8 @@ _WORST = {
     "percent": 3,
     "days": 3,
     "hours": 3,
+    # As long as an order's name can be (``FeedbackSurvey.order_name``).
+    "order": 40,
     "url": feedback.REVIEW_URL_MAX,
 }
 
@@ -100,6 +103,15 @@ TEMPLATES = (
             "Approved by Meta. It can only be changed in Meta's WhatsApp Manager, "
             "and Meta has to approve it again. It is sent instead of the chat "
             "question when her 24 hours have closed."
+        ),
+    },
+    {
+        "name": feedback.TRIED_TEMPLATE,
+        "body": "We tried to call you about your order {{1}}. Reply here or tell us a good time to call.",
+        "buttons": [],
+        "note": (
+            "Submit it to Meta in WhatsApp Manager. Until Meta approves it, a customer whose "
+            "24 hours have closed is not messaged and the chat tells your team to write to her."
         ),
     },
 )
@@ -184,6 +196,13 @@ def _build() -> tuple[Item, ...]:
         "We're sorry, {name}, and thank you for telling us. A member of our team will message "
         "you here within {hours} hours to make it right.",
         uses=("name", "hours"),
+    )
+    text_item(
+        "tried_to_call", "unhappy", "We tried to call you",
+        "Sent once, after the second call to her goes unanswered, while her 24 hours are open. "
+        "When they have closed, the message Meta approved goes instead (shown below), and its "
+        "words cannot be changed here.",
+        feedback.TRIED_CHAT, uses=("name", "order"),
     )
     text_item(
         "solved_question", "unhappy", "Was it solved? (in the chat)",
@@ -456,6 +475,8 @@ def _flows() -> dict[str, list[dict[str, Any]]]:
             message("reason_question.unhappy", answer, options=options("reason_option.unhappy."), button="list_label"),
             message("support", "After she picks a reason"),
             message("tell_us", "Only if she chose Something else", with_previous=True),
+            message("tried_to_call", "After the second call with no answer"),
+            template(feedback.TRIED_TEMPLATE, "Instead of the message above, when her 24 hours have closed"),
             message(
                 "solved_question", "A day after your team marks her as resolved",
                 options=options("solved_option."),

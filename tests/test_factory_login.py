@@ -26,6 +26,7 @@ from app.modules.production.orders.models import ProdCutReport, ProdFactoryAcces
 from app.shared.api.deps import FACTORY_REACHES, current_user, signed_in
 from app.shared.models.audit import AuditEvent
 from app.shared.models.identity import Invitation, UserAccount
+from tests.conftest import alembic_head
 from tests.test_prod_orders import (  # noqa: F401  (fixtures)
     CUT,
     PASSWORD,
@@ -45,7 +46,7 @@ from tests.test_prod_orders import (  # noqa: F401  (fixtures)
 )
 
 FACTORY_EMAIL = "cutting.room@example.com"
-HEAD = "a7c3e9d10040"
+HEAD = alembic_head()
 OWNER_NOTE = "Owner-only remark about margins"
 SAMPLE_NOTE = "Owner sample remark"
 

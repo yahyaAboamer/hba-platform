@@ -35,6 +35,9 @@ COLUMNS = (
     ("Resolved on", 17),
     ("Solved", 9),
     ("Times reopened", 15),
+    ("Calls with no answer", 12),
+    ("Last follow-up note", 50),
+    ("Couldn't reach", 24),
     ("Code", 12),
     ("Code sent", 17),
     ("Code used", 17),
@@ -71,6 +74,22 @@ def _line(row: dict) -> list:
     return [_clean(value) for value in _values(row)]
 
 
+def _last_note(row: dict) -> str | None:
+    """The newest note a person wrote (the platform's own lines are not)."""
+    for entry in reversed(row["history"]):
+        if entry["kind"] in ("no_answer", "note", "resolved") and entry["note"]:
+            return entry["note"]
+    return None
+
+
+def _unreached(row: dict) -> str | None:
+    when = _when(row["unreached_at"])
+    if when is None:
+        return None
+    day = f"{when:%Y-%m-%d}"
+    return f"{day} by {row['unreached_by_name']}" if row["unreached_by_name"] else day
+
+
 def _values(row: dict) -> list:
     return [
         _when(row["asked_at"]),
@@ -88,6 +107,9 @@ def _values(row: dict) -> list:
         _when(row["resolved_at"]),
         _yes_no(row["solved"]),
         row["reopened_count"],
+        sum(1 for entry in row["history"] if entry["kind"] == "no_answer"),
+        _last_note(row),
+        _unreached(row),
         row["code"],
         _when(row["code_sent_at"]),
         _when(row["code_used_at"]),
@@ -115,7 +137,7 @@ def build(rows: list[dict]) -> bytes:
             elif isinstance(cell.value, str):
                 # Words, never a formula (openpyxl reads a leading "=" as one).
                 cell.data_type = "s"
-                cell.alignment = Alignment(vertical="top", wrap_text=cell.column in (5, 10, 21))
+                cell.alignment = Alignment(vertical="top", wrap_text=cell.column in (5, 10, 17, 24))
     sheet.freeze_panes = "A2"
     output = io.BytesIO()
     workbook.save(output)

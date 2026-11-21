@@ -211,6 +211,16 @@ def test_one_row_has_everything_the_screen_needs(client, sheet):
         "code_expires_at": None,
         "code_used_at": None,
         "code_order_name": None,
+        "conversation_id": sheet["habiba"],
+        "history": [],
+        "no_answer_count": 0,
+        "message_sent": False,
+        "waiting_since": at(4).isoformat(),
+        "unreached_at": None,
+        "unreached_by_name": None,
+        "follow_up_round": 0,
+        "tried_to_call_text": None,
+        "follow_up_state": "resolved",
     }
     print("ROW", json.dumps(row))
 
@@ -262,14 +272,14 @@ def test_the_summary_follows_the_filters(client, sheet):
     assert summary == {
         "asked": 5, "answered": 5, "loved": 1, "okay": 1, "unhappy": 3,
         "needs_follow_up": 2, "solved": 1, "codes_sent": 1, "codes_used": 1,
-        "not_reached": 1,
+        "not_reached": 1, "overdue": 2, "solved_asked": 2, "unreached": 0,
     }
     print("SUMMARY", json.dumps(summary))
     narrowed = client.get("/api/inbox/feedback", params={"courier": "Aramex"}).json()["summary"]
     assert narrowed == {
         "asked": 2, "answered": 2, "loved": 0, "okay": 0, "unhappy": 2,
         "needs_follow_up": 2, "solved": 0, "codes_sent": 0, "codes_used": 0,
-        "not_reached": 0,
+        "not_reached": 0, "overdue": 2, "solved_asked": 1, "unreached": 0,
     }
 
 
@@ -297,7 +307,7 @@ def test_the_filters_menus(client, sheet):
         {"id": "other", "title": "Something else"},
     ]
     assert set(options["reasons"]) == {"loved", "okay", "unhappy"}
-    assert [s["id"] for s in options["states"]] == ["needs_follow_up", "resolved", "reopened"]
+    assert [s["id"] for s in options["states"]] == ["needs_follow_up", "resolved", "reopened", "unreached"]
     print("OPTIONS", json.dumps(options))
 
 
@@ -338,8 +348,8 @@ def test_the_download_is_an_xlsx_of_the_filtered_rows(client, sheet):
     assert list(lines[0]) == [
         "Asked", "Customer", "Phone", "Order", "Products", "Courier", "Delivered", "Rating",
         "Reason", "Comment", "Would order again", "Resolved by", "Resolved on", "Solved",
-        "Times reopened", "Code", "Code sent", "Code used", "Used on order", "Sending",
-        "Problem",
+        "Times reopened", "Calls with no answer", "Last follow-up note", "Couldn't reach",
+        "Code", "Code sent", "Code used", "Used on order", "Sending", "Problem",
     ]
     body = {line[3]: line for line in lines[1:]}
     assert set(body) == {"#7001", "#7003", "#7005", "#7009"}
@@ -347,9 +357,9 @@ def test_the_download_is_an_xlsx_of_the_filtered_rows(client, sheet):
     assert nour[1] == "Nour" and nour[2] == "201005550101"
     assert nour[4] == "Linen trousers; Cotton shirt"
     assert (nour[7], nour[8], nour[9], nour[10]) == ("Loved it", "Quality", "Beautiful fabric", "Very likely")
-    assert (nour[15], nour[19]) == ("FB-AAAAAA", "Sent")
+    assert (nour[18], nour[22]) == ("FB-AAAAAA", "Sent")
     assert nour[0].date() == business_date(utcnow()) - timedelta(days=3)  # a real date
-    assert nour[17] is not None and nour[18] == "#7100"
+    assert nour[20] is not None and nour[21] == "#7100"
     assert body["#7003"][11] == "Owner" and body["#7003"][13] == "Yes"
     # A customer's words are text, never a formula.
     assert body["#7009"][9] == "=1+1" and body["#7009"][1].startswith("=HYPERLINK")
@@ -411,9 +421,11 @@ def test_an_empty_download_is_still_a_sheet(client, sheet):
 
 # ── Resolved ──────────────────────────────────────────────────────────────────
 
+AGREED = {"note": "Exchange to size L agreed"}
+
 
 def test_resolved_marks_the_follow_up_and_says_who(client, sheet):
-    response = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
+    response = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED)
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["resolved_by_name"] == "Owner" and body["resolved_at"]
@@ -423,14 +435,18 @@ def test_resolved_marks_the_follow_up_and_says_who(client, sheet):
 
 
 def test_resolved_is_refused_in_words(client, sheet):
-    assert client.post("/api/inbox/feedback/999999/resolve").status_code == 404
+    assert client.post("/api/inbox/feedback/999999/resolve", json=AGREED).status_code == 404
     # Not unhappy.
-    refused = client.post(f"/api/inbox/feedback/{sheet['loved']}/resolve")
+    refused = client.post(f"/api/inbox/feedback/{sheet['loved']}/resolve", json=AGREED)
     assert refused.status_code == 422
     assert "unhappy" in refused.json()["detail"]
+    # No note: nothing is resolved (ADR 0088).
+    bare = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
+    assert bare.status_code == 422
+    assert bare.json()["detail"] == "Write what you agreed with her before resolving."
     # Already resolved: pressed twice.
-    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve").status_code == 200
-    again = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
+    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED).status_code == 200
+    again = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED)
     assert again.status_code == 422
 
 
@@ -460,8 +476,17 @@ def test_the_chat_carries_the_latest_survey(client, sheet):
         "code": None,
         "code_used": False,
         "is_test": False,
+        "history": [],
+        "no_answer_count": 0,
+        "message_sent": False,
+        "waiting_since": at(2).isoformat(),
+        "unreached_at": None,
+        "unreached_by_name": None,
+        "follow_up_round": 0,
+        "tried_to_call_text": "We tried to call you about your order #7002. Reply here or tell us a good time to call.",
+        "reply_hours": 24,
+        "enabled": False,
     }
-    print("CHAT", json.dumps(detail["feedback"]))
     used = client.get(f"/api/inbox/conversations/{sheet['nour']}").json()["feedback"]
     assert used["code"] == "FB-AAAAAA" and used["code_used"] is True
     resolved = client.get(f"/api/inbox/conversations/{sheet['habiba']}").json()["feedback"]
@@ -522,7 +547,7 @@ def test_the_chips_count_follow_up(client, sheet):
     counts = client.get("/api/inbox/conversations").json()["counts"]
     assert counts == {"all": 5, "unread": 0, "edit": 0, "follow_up": 2}
     # Resolving takes the chat out of the chip and the view.
-    client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
+    client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED)
     assert client.get("/api/inbox/conversations").json()["counts"]["follow_up"] == 1
     assert _view(client, "follow_up") == ["Mona Fathy"]
 
@@ -555,7 +580,7 @@ def test_today_is_quiet_when_nobody_is_waiting(client):
 
 
 def test_a_single_one_is_worded_in_the_singular(client, sheet):
-    client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
+    client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED)
     items = {i["key"]: i for i in client.get("/api/today").json()["items"]}
     assert items["inbox.feedback_follow_up"]["what"] == "1 unhappy customer needs a follow-up"
 
@@ -645,7 +670,7 @@ def test_customer_service_lists_downloads_and_resolves_but_never_changes_setting
     assert client.get("/api/inbox/feedback").status_code == 200
     assert client.get("/api/inbox/feedback/download").status_code == 200
     assert client.get("/api/inbox/feedback/settings").status_code == 200
-    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve").status_code == 200
+    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED).status_code == 200
     assert client.put("/api/inbox/feedback/settings", json={"reply_hours": 12}).status_code == 403
     assert client.get("/api/inbox/conversations", params={"view": "follow_up"}).status_code == 200
 
@@ -656,7 +681,7 @@ def test_a_role_without_the_inbox_gets_nothing(client, sheet, role):
     assert client.get("/api/inbox/feedback").status_code == 403
     assert client.get("/api/inbox/feedback/download").status_code == 403
     assert client.get("/api/inbox/feedback/settings").status_code == 403
-    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve").status_code == 403
+    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED).status_code == 403
     assert client.put("/api/inbox/feedback/settings", json={"reply_hours": 12}).status_code == 403
     assert client.get("/api/inbox/conversations", params={"view": "neutral"}).status_code == 403
 
@@ -671,3 +696,172 @@ def test_nobody_signed_out_reaches_the_feedback(fresh_database):
 def test_the_new_view_is_refused_nowhere_but_unknown_views_are(client, sheet):
     assert client.get("/api/inbox/conversations", params={"view": "follow_up"}).status_code == 200
     assert client.get("/api/inbox/conversations", params={"view": "angry"}).status_code == 422
+
+
+# ── The follow-up record (ADR 0088) ───────────────────────────────────────────
+
+
+def _open_one(db, order: str, rated_days_ago: int = 1, **fields) -> FeedbackSurvey:
+    return survey(
+        db, order, phone="2010055502" + order[-2:], customer_name="Sara", products=["Wide jeans"],
+        step="support", delivered_at=at(rated_days_ago + 2), sent_at=at(rated_days_ago + 1),
+        rating="unhappy", rated_at=at(rated_days_ago), reason="size_fit", **fields,
+    )
+
+
+def test_resolved_needs_a_note_in_words(client, sheet):
+    bare = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
+    assert bare.status_code == 422
+    assert bare.json()["detail"] == "Write what you agreed with her before resolving."
+    done = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json={"note": "Exchange"})
+    assert done.status_code == 200, done.text
+    last = done.json()["history"][-1]
+    assert (last["kind"], last["note"], last["by_name"]) == ("resolved", "Exchange", "Owner")
+    assert done.json()["follow_up_state"] == "resolved"
+
+
+def test_no_answer_and_note_endpoints(client, sheet):
+    from app.shared.models.integration import BackgroundJob
+
+    url = f"/api/inbox/feedback/{sheet['unhappy']}"
+    first = client.post(f"{url}/no-answer")
+    assert first.status_code == 200, first.text
+    assert first.json()["no_answer_count"] == 1
+    # Closing would be the 2nd call: too early, and nothing is written.
+    early = client.post(f"{url}/no-answer", json={"close": True})
+    assert early.status_code == 422 and "third call" in early.json()["detail"]
+    second = client.post(f"{url}/no-answer", json={"note": "Rang twice"}).json()
+    assert second["no_answer_count"] == 2
+    with SessionLocal() as db:
+        jobs = db.scalars(
+            select(BackgroundJob).where(BackgroundJob.kind == "inbox_feedback_tried_to_call")
+        ).all()
+        assert len(jobs) == 1
+    noted = client.post(f"{url}/note", json={"note": "Spoke to the courier"}).json()
+    assert [e["kind"] for e in noted["history"]] == ["no_answer", "no_answer", "note"]
+    assert client.post(f"{url}/note", json={"note": "  "}).status_code == 422
+    closed = client.post(f"{url}/no-answer", json={"close": True}).json()
+    assert closed["follow_up_state"] == "unreached" and closed["needs_follow_up"] is False
+    assert closed["unreached_by_name"] == "Owner" and closed["unreached_at"]
+    assert closed["history"][-1]["kind"] == "unreached"
+    assert client.post(f"{url}/note", json={"note": "late"}).status_code == 422
+
+
+def test_the_follow_up_list_ignores_the_sheet_filters_and_tests(client, sheet):
+    with SessionLocal() as db:
+        _open_one(db, "7101", rated_days_ago=60)
+        _open_one(db, "7102", rated_days_ago=1, is_test=True)
+        db.commit()
+    body = client.get("/api/inbox/feedback/follow-up").json()
+    assert set(body) == {"rows", "reply_hours"} and body["reply_hours"] == 24
+    # Salma (2 days), Mona (reopened, 5 days) and the 60-day one; oldest first.
+    assert [r["order_name"] for r in body["rows"]] == ["#7101", "#7004", "#7002"]
+    assert all(r["needs_follow_up"] and r["follow_up_state"] == "needs_follow_up" for r in body["rows"])
+    assert body["rows"][0]["conversation_id"] is None
+
+
+def test_the_summary_counts_overdue_unreached_and_solved_asked(client, sheet):
+    with SessionLocal() as db:
+        _open_one(db, "7103", rated_days_ago=0)
+        done = _open_one(db, "7104", rated_days_ago=3)
+        done.step, done.unreached_at = "done", utcnow()
+        db.commit()
+    summary = client.get("/api/inbox/feedback").json()["summary"]
+    # Overdue: Salma (2 days) and Mona (5 days) are past 24 h; today's is not.
+    assert summary["overdue"] == 2
+    assert summary["solved_asked"] == 2  # Habiba (yes) and Mona (no)
+    assert summary["unreached"] == 1
+    assert summary["needs_follow_up"] == 3
+
+
+def test_filters_couldnt_reach_and_no_answer_yet(client, sheet):
+    with SessionLocal() as db:
+        gone = _open_one(db, "7105", rated_days_ago=3)
+        gone.step, gone.unreached_at = "done", utcnow()
+        db.commit()
+    assert orders(client, state="unreached") == ["#7105"]
+    assert orders(client, rating="none") == ["#7006"]
+    states = client.get("/api/inbox/feedback").json()["options"]["states"]
+    assert {"id": "unreached", "title": "Couldn't reach"} in states
+    assert {"id": "needs_follow_up", "title": "To follow up"} in states
+
+
+def test_the_search_also_matches_product_titles(client, sheet):
+    assert sorted(orders(client, q="jeans")) == ["#7002", "#7004"]
+
+
+def test_the_download_has_the_follow_up_columns(client, sheet):
+    url = f"/api/inbox/feedback/{sheet['unhappy']}"
+    client.post(f"{url}/no-answer", json={"note": "Rang"})
+    client.post(f"{url}/no-answer")
+    client.post(f"{url}/note", json={"note": "Will try tomorrow"})
+    client.post(f"{url}/no-answer", json={"close": True})
+    response = client.get("/api/inbox/feedback/download", params={"rating": "unhappy"})
+    lines = list(load_workbook(io.BytesIO(response.content)).active.iter_rows(values_only=True))
+    head = list(lines[0])
+    row = next(line for line in lines[1:] if line[3] == "#7002")
+    assert row[head.index("Calls with no answer")] == 3
+    assert row[head.index("Last follow-up note")] == "Will try tomorrow"
+    today = business_date(utcnow()).isoformat()
+    assert row[head.index("Couldn't reach")] == f"{today} by Owner"
+    other = next(line for line in lines[1:] if line[3] == "#7003")
+    assert other[head.index("Calls with no answer")] == 0
+    assert other[head.index("Couldn't reach")] is None
+
+
+def test_the_chat_carries_the_history(client, sheet):
+    client.post(f"/api/inbox/feedback/{sheet['unhappy']}/no-answer", json={"note": "Rang"})
+    block = client.get(f"/api/inbox/conversations/{sheet['salma']}").json()["feedback"]
+    assert [e["kind"] for e in block["history"]] == ["no_answer"]
+    assert block["history"][0]["by_name"] == "Owner"
+    assert block["waiting_since"] == at(2).isoformat() and block["reply_hours"] == 24
+
+
+def test_a_list_of_surveys_is_read_in_a_fixed_number_of_queries(client, sheet):
+    from sqlalchemy import event
+
+    from app.modules.inbox.services import feedback_follow_up
+
+    with SessionLocal() as db:
+        rows = list(db.scalars(select(FeedbackSurvey)))
+        count = []
+        listener = lambda *args: count.append(1)  # noqa: E731
+        event.listen(engine, "before_cursor_execute", listener)
+        try:
+            found = feedback_follow_up.describe_many(db, rows)
+        finally:
+            event.remove(engine, "before_cursor_execute", listener)
+    assert len(found) == len(rows) >= 7
+    # The history, the names on it, the wording and the chats' 24 hours.
+    assert len(count) <= 4
+
+
+def test_the_chat_says_whether_feedback_is_switched_on(client, sheet, monkeypatch):
+    monkeypatch.setattr("app.config.settings.inbox_feedback_enabled", True)
+    assert client.get(f"/api/inbox/conversations/{sheet['salma']}").json()["feedback"]["enabled"] is True
+
+
+def test_an_open_follow_up_carries_the_words_she_would_be_sent(client, sheet):
+    """The chat message's words while her 24 hours are open, the approved
+    message's once they have closed, and nothing once it is accounted for or
+    the follow-up is not open."""
+    with SessionLocal() as db:
+        db.get(InboxConversation, sheet["mona"]).last_inbound_at = utcnow() - timedelta(hours=30)
+        saved = db.get(FeedbackSettings, 1) or FeedbackSettings(id=1)
+        saved.messages = {"tried_to_call": "{name}, we called about {order}."}
+        db.add(saved)
+        db.commit()
+    rows = {r["order_name"]: r for r in client.get("/api/inbox/feedback/follow-up").json()["rows"]}
+    assert rows["#7002"]["tried_to_call_text"] == "Salma, we called about #7002."
+    assert rows["#7004"]["tried_to_call_text"] == feedback.TRIED_CHAT.format(order="#7004")
+    sheet_rows = {r["order_name"]: r for r in client.get("/api/inbox/feedback").json()["rows"]}
+    assert sheet_rows["#7001"]["tried_to_call_text"] is None
+
+    from app.modules.inbox.services import feedback_follow_up
+
+    with SessionLocal() as db:
+        row = db.get(FeedbackSurvey, sheet["unhappy"])
+        feedback_follow_up.add_entry(db, row, "message_failed", note="Couldn't send")
+        db.commit()
+    rows = {r["order_name"]: r for r in client.get("/api/inbox/feedback/follow-up").json()["rows"]}
+    assert rows["#7002"]["tried_to_call_text"] is None

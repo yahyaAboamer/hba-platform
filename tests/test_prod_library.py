@@ -12,6 +12,7 @@ from app.db import SessionLocal, engine
 from app.modules.production.orders.services import library as library_service
 from app.shared.models.audit import AuditEvent
 from app.shared.models.catalogue import Product, ProductVariant
+from tests.conftest import alembic_head
 from tests.test_prod_orders import (  # noqa: F401  (fixtures)
     PNG,
     _Bucket,
@@ -466,7 +467,7 @@ def test_the_migration_goes_down_and_up_cleanly_when_empty(fresh_database):
             assert connection.execute(text("SELECT to_regclass('prod_library_file')")).scalar_one() is None
     finally:
         command.upgrade(config, "head")
-    assert _version() == "a7c3e9d10040"
+    assert _version() == alembic_head()
 
 
 def test_the_downgrade_refuses_while_a_library_record_exists(owner):
@@ -476,4 +477,4 @@ def test_the_downgrade_refuses_while_a_library_record_exists(owner):
     assert _patch(owner, {"colour_code": "Black"}).status_code == 200
     with pytest.raises(RuntimeError, match="Library record"):
         command.downgrade(Config("alembic.ini"), "f1c2d3e40039")
-    assert _version() == "a7c3e9d10040"
+    assert _version() == alembic_head()
