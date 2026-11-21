@@ -225,7 +225,7 @@ export function OrderList({ session }: { session: Session }) {
             <p className="prod-small" role="status">
               {found.length === 0
                 ? "No order matches. The search looks through open and closed orders."
-                : `${found.length} order${found.length === 1 ? "" : "s"} match, open and closed.`}
+                : found.length === 1 ? "1 order matches, open and closed." : `${found.length} orders match, open and closed.`}
             </p>
           )}
 

@@ -110,6 +110,7 @@ describe("Production orders list", () => {
 
       fireEvent.change(box, { target: { value: "grey" } });
       expect(names()).toEqual(["Wide-leg sweatpants · Grey"]);
+      expect(screen.getByText("1 order matches, open and closed.")).toBeTruthy();
 
       fireEvent.change(box, { target: { value: "FLEECE rush" } });
       expect(names()).toEqual(["Boxy tee · Black"]);

@@ -276,7 +276,7 @@ export function TaskScreen({ session }: { session: Session }) {
             <p className="prod-small" role="status">
               {found.length === 0
                 ? `No ${view === "open" ? "open" : "done"} task matches.`
-                : `${found.length} ${view === "open" ? "open" : "done"} task${found.length === 1 ? "" : "s"} match.`}
+                : `${found.length} ${view === "open" ? "open" : "done"} task${found.length === 1 ? " matches" : "s match"}.`}
             </p>
           )}
 
