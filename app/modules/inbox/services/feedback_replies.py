@@ -443,7 +443,7 @@ def resolve(
 ) -> dict:
     """A person has followed up an unhappy answer. Only for an unhappy answer
     waiting for a person, and only with a note saying what was agreed with
-    her, which goes in the follow-up's history (ADR 0087).
+    her, which goes in the follow-up's history (ADR 0088).
 
     A day later she is asked whether it was solved - unless she has already
     said *No* twice, in which case it is closed without asking again.

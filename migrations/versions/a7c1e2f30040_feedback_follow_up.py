@@ -1,6 +1,6 @@
 """feedback follow-up: a record of every call, note and close
 
-ADR 0087 (amends ADR 0083, decisions 4 and 6).
+ADR 0088 (amends ADR 0083, decisions 4 and 6).
 
 - `feedback_follow_up`: one row per thing done on an unhappy answer's
   follow-up - a call with no answer, a note, *Resolved* with what was agreed,
@@ -23,7 +23,7 @@ Downgrade refuses while the history holds anything a person wrote or did
 *Couldn't reach*, rather than lose it; with none, it takes them away.
 
 Revision ID: a7c1e2f30040
-Revises: f1c2d3e40039
+Revises: a7c3e9d10040
 Create Date: 2026-11-21
 """
 from typing import Sequence, Union
@@ -32,7 +32,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "a7c1e2f30040"
-down_revision: Union[str, Sequence[str], None] = "f1c2d3e40039"
+down_revision: Union[str, Sequence[str], None] = "a7c3e9d10040"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -119,7 +119,7 @@ def main() -> None:
         return survey
 
     def log(survey, *entries):
-        """Follow-up history (ADR 0087): ``(kind, hours_ago, who, note)`` each."""
+        """Follow-up history (ADR 0088): ``(kind, hours_ago, who, note)`` each."""
         for kind, hours_ago, who, note in entries:
             db.add(FeedbackFollowUp(
                 survey_id=survey.id, round=survey.follow_up_round, kind=kind, note=note,

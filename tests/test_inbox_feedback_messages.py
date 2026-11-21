@@ -257,7 +257,7 @@ def test_a_placeholder_a_message_cannot_use_is_refused_in_plain_words():
 
 
 def test_tried_to_call_words_are_editable_and_take_the_order(db):
-    """The message after the second unanswered call (ADR 0087) names the order."""
+    """The message after the second unanswered call (ADR 0088) names the order."""
     item = feedback_messages.BY_KEY["tried_to_call"]
     assert (item.group, item.kind, item.placeholders) == ("unhappy", "text", ("name", "order"))
     assert item.default == (

@@ -92,6 +92,45 @@ describe("Production orders list", () => {
     expect(table.textContent).toContain("Finished on time");
   });
 
+  it("searches every order, open and closed, by number, style, colour, factory, fabric, stage and notes", async () => {
+    const before = open[2];
+    open[2] = { ...before, fabric_type: "Cotton fleece 320 gsm", notes: "Rush for the drop" };
+    try {
+      serveBoth();
+      renderAt("/production/orders", owner());
+      await screen.findByRole("table");
+      const box = screen.getByRole("searchbox", { name: /Search orders/ });
+      const names = () => within(screen.getByRole("table")).getAllByRole("link").map((link) => link.textContent);
+
+      fireEvent.change(box, { target: { value: "hoodie" } });
+      expect(names()).toEqual(["Oversized hoodie · Off-white", "Zip hoodie · Olive"]);
+      expect(screen.getByText("2 orders match, open and closed.")).toBeTruthy();
+      // No chip is on while a search is.
+      expect(screen.getByRole("button", { name: "In production · 3" }).getAttribute("aria-pressed")).toBe("false");
+
+      fireEvent.change(box, { target: { value: "grey" } });
+      expect(names()).toEqual(["Wide-leg sweatpants · Grey"]);
+      expect(screen.getByText("1 order matches, open and closed.")).toBeTruthy();
+
+      fireEvent.change(box, { target: { value: "FLEECE rush" } });
+      expect(names()).toEqual(["Boxy tee · Black"]);
+
+      fireEvent.change(box, { target: { value: "PO-2611-02 sample" } });
+      expect(names()).toEqual(["Zip hoodie · Olive"]);
+
+      fireEvent.change(box, { target: { value: "nothing like this" } });
+      expect(screen.queryByRole("table")).toBeNull();
+      expect(screen.getByText("No order matches. The search looks through open and closed orders.")).toBeTruthy();
+
+      // Pressing a chip leaves the search.
+      fireEvent.click(screen.getByRole("button", { name: "Late · 1" }));
+      expect((box as HTMLInputElement).value).toBe("");
+      expect(names()).toEqual(["Oversized hoodie · Off-white"]);
+    } finally {
+      open[2] = before;
+    }
+  });
+
   it("offers New order to the owner only", async () => {
     serveBoth();
     renderAt("/production/orders", owner());

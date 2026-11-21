@@ -216,7 +216,7 @@
 .inbox-fb-block__said { white-space:pre-wrap; }
 .inbox-fb-block .inbox-setstatus { margin-top:10px; }
 
-/* ── A follow-up's record, clock and pop-ups (ADR 0087; FollowUp.tsx) ──── */
+/* ── A follow-up's record, clock and pop-ups (ADR 0088; FollowUp.tsx) ──── */
 .inbox-fu-heading { margin:14px 0 6px; font-size:13px; }
 .inbox-fu-history ul { margin:0; padding:0; list-style:none; font-size:12.5px; line-height:1.45; }
 .inbox-fu-entry { position:relative; margin-bottom:6px; padding-left:14px; color:var(--quiet); overflow-wrap:anywhere; }
@@ -249,7 +249,7 @@
 .inbox-fu-problem { margin:12px 0 0; }
 .inbox-fu-dialog__acts { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:16px; }
 
-/* ── Feedback: four cards, To follow up, and the sheet (ADR 0083, 0087) ─── */
+/* ── Feedback: four cards, To follow up, and the sheet (ADR 0083, 0088) ─── */
 .inbox-fb__headacts { display:flex; flex-wrap:wrap; gap:8px; }
 
 /* The four cards: the bar gets the room it needs. */

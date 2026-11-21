@@ -7,7 +7,7 @@ import { FollowUpActions, FollowUpHistory, WaitingClock } from "./FollowUp";
 
 /**
  * How her delivered order went, in her own words, beside her chat
- * (ADR 0083, decision 4; ADR 0087).
+ * (ADR 0083, decision 4; ADR 0088).
  *
  * An unhappy answer is followed up by a person, who records what happened:
  * a call she did not answer, a note, or *Resolved* with what was agreed. A day

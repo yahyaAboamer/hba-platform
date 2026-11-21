@@ -5,7 +5,7 @@ import type { FeedbackOptions, FeedbackRow, FollowUpEntry } from "../../lib/inbo
 import { clockTime, dayMonth } from "../../components/OpsSource";
 
 /**
- * The Feedback sheet's rows (ADR 0083 decision 6, ADR 0087): seven columns on
+ * The Feedback sheet's rows (ADR 0083 decision 6, ADR 0088): seven columns on
  * a wide screen, a card each on a phone, in the same order. The pieces that
  * say what a row is (answer, customer, comment) are shared with the
  * *To follow up* list.

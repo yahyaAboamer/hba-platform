@@ -323,11 +323,18 @@ export function ProductCard({ order, powers, open, run }: CardProps & { run: Run
     <section className="prod-block" aria-labelledby="prod-product">
       <div className="prod-block__head">
         <h2 id="prod-product">Product</h2>
-        {powers.isOwner && isOpen(order) && (
-          <button type="button" className="button button--row" onClick={() => open({ kind: "product" })}>
-            Edit details
-          </button>
-        )}
+        <div className="prod-head-actions">
+          {order.shopify_product_id && (
+            <Link className="button button--row" to={`/production/library/${encodeURIComponent(order.shopify_product_id)}`}>
+              Open in the Library
+            </Link>
+          )}
+          {powers.isOwner && isOpen(order) && (
+            <button type="button" className="button button--row" onClick={() => open({ kind: "product" })}>
+              Edit details
+            </button>
+          )}
+        </div>
       </div>
       {error && <Problem>{error}</Problem>}
       <dl className="prod-details prod-product">

@@ -38,8 +38,8 @@
 ### Task 1: Rules, table and migration
 
 **Files:**
-- Create: `docs/adr/0087-a-follow-up-keeps-a-record-of-every-call.md` (template: `docs/adr/template.md`; content = the spec's "The rules" + "Settled after the builder check"; amends ADR 0083 decisions 4 and 6)
-- Modify: `docs/RULES.md` (the Inbox feedback section near line 256: add the follow-up rules in 4–6 bullets, pointing to ADR 0087)
+- Create: `docs/adr/0088-a-follow-up-keeps-a-record-of-every-call.md` (template: `docs/adr/template.md`; content = the spec's "The rules" + "Settled after the builder check"; amends ADR 0083 decisions 4 and 6)
+- Modify: `docs/RULES.md` (the Inbox feedback section near line 256: add the follow-up rules in 4–6 bullets, pointing to ADR 0088)
 - Modify: `app/modules/inbox/models.py` (new `FeedbackFollowUp`; new columns on `FeedbackSurvey`)
 - Create: `migrations/versions/a7c1e2f30040_feedback_follow_up.py` (down_revision `f1c2d3e40039`)
 - Test: `tests/test_inbox_feedback_follow_up.py` (new)
@@ -54,7 +54,7 @@
 - [ ] **Step 2: Run it, expect FAIL** (import error).
 - [ ] **Step 3: Write model, migration, ADR, RULES.md.**
 - [ ] **Step 4: Migrate the test DB and run the test:** `DATABASE_URL=... $PY -m alembic upgrade head`, then the test file. Expect PASS. Also run `DATABASE_URL=... $PY -m alembic downgrade -1 && ... upgrade head` and expect both to succeed.
-- [ ] **Step 5: Commit** `feat(inbox): feedback follow-up history table (ADR 0087)`.
+- [ ] **Step 5: Commit** `feat(inbox): feedback follow-up history table (ADR 0088)`.
 
 ---
 

@@ -1,6 +1,6 @@
 """feedback follow-up: claim the "we tried to call you" message before sending
 
-ADR 0087, decision 4.
+ADR 0088, decision 4.
 
 `feedback_survey` gains `tried_claimed_round` and `tried_claimed_at`: the
 round whose tried-to-call message was taken for sending, and when. The claim

@@ -87,7 +87,7 @@ FEEDBACK_REORDERS = ("very_likely", "maybe", "unlikely")
 #: reason, her words, a person (an unhappy answer), her tap on *Was your issue
 #: solved?*, her tap on how likely she is to order again, or nothing.
 FEEDBACK_STEPS = ("rating", "reason", "comment", "support", "solved", "reorder", "done")
-#: What one line of a follow-up's history records (ADR 0087). A person's:
+#: What one line of a follow-up's history records (ADR 0088). A person's:
 #: a call with no answer, a note, *Resolved* (with what was agreed), and
 #: *Couldn't reach*. The platform's: the WhatsApp message after the second
 #: unanswered call, sent or not; she wrote back after *Couldn't reach*; and
@@ -520,7 +520,7 @@ class FeedbackSurvey(Base):
     solved: Mapped[bool | None] = mapped_column(Boolean)
     solved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reopened_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-    #: Which round of follow-up this is (ADR 0087). A round starts when she
+    #: Which round of follow-up this is (ADR 0088). A round starts when she
     #: answers *Not happy* (round 0), when she says *No, not solved*, and when
     #: she writes back after *Couldn't reach*. The no-answer count and the
     #: tried-to-call message are per round; ``reopened_count`` keeps its one
@@ -580,7 +580,7 @@ class FeedbackSurvey(Base):
 
 
 class FeedbackFollowUp(Base):
-    """One line of an unhappy answer's follow-up history (ADR 0087): a call
+    """One line of an unhappy answer's follow-up history (ADR 0088): a call
     with no answer, a note, *Resolved*, *Couldn't reach*, or something the
     platform did on its own.
 

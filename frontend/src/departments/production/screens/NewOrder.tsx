@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { api, can } from "../../../lib/api";
 import type { Session } from "../../../lib/api";
-import { DATED_STAGES, DATE_LABELS, fillDates } from "./logic";
+import { cogsText, hasCogs } from "./libraryLogic";
+import { COST_PARTS, DATED_STAGES, DATE_LABELS, fillDates, isBlank } from "./logic";
 import { cairoToday } from "./format";
 import type { DatedStage } from "./logic";
-import { OrderFields, draftBody, draftProblem, emptyDraft } from "./OrderFields";
-import type { Choices, OrderAnswer, StageKey } from "./types";
+import { NEW_STYLE, OrderFields, draftBody, draftProblem, emptyDraft } from "./OrderFields";
+import type { Choices, LibraryItem, OrderAnswer, StageKey } from "./types";
 import { Problem } from "./ui";
 
 type Dates = Record<DatedStage, string>;
@@ -26,6 +27,9 @@ export function NewOrder({ session }: { session: Session }) {
   const [touched, setTouched] = useState<ReadonlySet<DatedStage>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [params] = useSearchParams();
+  // Whether the target cost was filled from the Library's COGS (ADR 0087), for the line that says so.
+  const [costFromLibrary, setCostFromLibrary] = useState(false);
 
   useEffect(() => {
     if (!isOwner) return;
@@ -33,6 +37,37 @@ export function NewOrder({ session }: { session: Session }) {
       .then(setChoices)
       .catch((caught) => setLoadError(caught instanceof Error ? caught.message : "The form could not be loaded."));
   }, [isOwner]);
+
+  // Opened from a Library page (`?product=`): that product is the style.
+  const wanted = params.get("product");
+  useEffect(() => {
+    if (!choices || !wanted) return;
+    const product = choices.products.find((candidate) => candidate.id === wanted);
+    if (product) setDraft((before) => (before.productId ? before : { ...before, productId: product.id, styleName: product.title }));
+  }, [choices, wanted]);
+
+  // A Library product with a COGS fills the target cost per piece, while every box of it is still blank.
+  // The colour code, fabric and print come from the Library on the server's side.
+  const productId = draft.productId;
+  useEffect(() => {
+    setCostFromLibrary(false);
+    if (!productId || productId === NEW_STYLE) return;
+    let current = true;
+    api.get<{ product: LibraryItem }>(`/api/prod/library/${encodeURIComponent(productId)}`)
+      .then(({ product }) => {
+        if (!current || !hasCogs(product.cogs)) return;
+        const cogs = product.cogs;
+        setDraft((before) => {
+          if (before.productId !== productId || COST_PARTS.some((part) => !isBlank(before.target[part]))) return before;
+          setCostFromLibrary(true);
+          return { ...before, target: cogsText(cogs) };
+        });
+      })
+      .catch(() => undefined); // the form works the same without it
+    return () => {
+      current = false;
+    };
+  }, [productId]);
 
   // The expected date of each stage, backwards from the target date: again when the date or the tick changes.
   useEffect(() => {
@@ -90,6 +125,11 @@ export function NewOrder({ session }: { session: Session }) {
         <div className="prod-block">
           <form className="prod-form" onSubmit={create} noValidate>
             <OrderFields draft={draft} onChange={setDraft} choices={choices} />
+            {costFromLibrary && (
+              <p className="prod-small prod-wide" role="status">
+                The target cost per piece is filled from this product&apos;s COGS in the Library. Change it if this run costs differently.
+              </p>
+            )}
 
             <fieldset className="prod-fieldset prod-wide">
               <legend className="field__label">Expected date for each stage, filled in from the target date. Change any of them.</legend>

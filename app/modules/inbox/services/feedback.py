@@ -95,7 +95,7 @@ SOLVED_CHAT = "Was your issue solved? · {order}"
 #: The answers to it, in the order of its two buttons.
 SOLVED_ANSWERS = ("yes", "no")
 
-#: The third approved message (ADR 0087): "we tried to call you", for an
+#: The third approved message (ADR 0088): "we tried to call you", for an
 #: unhappy customer whose 24 hours have closed by the time the second call to
 #: her went unanswered. One detail (the order's name), no buttons. Its words
 #: are Meta's; ``TRIED_CHAT`` is what the chat shows for it.

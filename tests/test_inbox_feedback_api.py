@@ -440,7 +440,7 @@ def test_resolved_is_refused_in_words(client, sheet):
     refused = client.post(f"/api/inbox/feedback/{sheet['loved']}/resolve", json=AGREED)
     assert refused.status_code == 422
     assert "unhappy" in refused.json()["detail"]
-    # No note: nothing is resolved (ADR 0087).
+    # No note: nothing is resolved (ADR 0088).
     bare = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
     assert bare.status_code == 422
     assert bare.json()["detail"] == "Write what you agreed with her before resolving."
@@ -698,7 +698,7 @@ def test_the_new_view_is_refused_nowhere_but_unknown_views_are(client, sheet):
     assert client.get("/api/inbox/conversations", params={"view": "angry"}).status_code == 422
 
 
-# ── The follow-up record (ADR 0087) ───────────────────────────────────────────
+# ── The follow-up record (ADR 0088) ───────────────────────────────────────────
 
 
 def _open_one(db, order: str, rated_days_ago: int = 1, **fields) -> FeedbackSurvey:

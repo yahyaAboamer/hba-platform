@@ -1,5 +1,5 @@
 """What a person does to follow up an unhappy answer, kept as a record
-(ADR 0087, amending ADR 0083 decisions 4 and 6).
+(ADR 0088, amending ADR 0083 decisions 4 and 6).
 
 A follow-up is **open** while the answer is *Not happy* and the survey waits
 for a person (step ``support``). While it is open a person can press

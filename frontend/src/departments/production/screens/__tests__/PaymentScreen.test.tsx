@@ -64,7 +64,7 @@ describe("The Payments section", () => {
   it("is in the sidebar, between Suppliers and Stage days, only for the owner", () => {
     const sections = (session: ReturnType<typeof owner>) =>
       departmentsFor(session).find((department) => department.key === "production")?.sections.map((section) => section.label);
-    expect(sections(owner())).toEqual(["Overview", "Orders", "Tasks", "Incoming", "Suppliers", "Payments", "Stage days"]);
+    expect(sections(owner())).toEqual(["Overview", "Orders", "Tasks", "Library", "Incoming", "Suppliers", "Payments", "Stage days"]);
     expect(sections(qc())).not.toContain("Payments");
     expect(sections(qc())).toContain("Suppliers");
   });

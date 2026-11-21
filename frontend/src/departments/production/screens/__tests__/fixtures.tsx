@@ -151,6 +151,10 @@ export function makeOrder(
     colour: "Black",
     status: "open",
     factory: { id: "SUP-1", name: "Main factory" },
+    image_url: null,
+    colour_code: null,
+    fabric_type: null,
+    print_supplier_name: null,
     stage: { key: stage, label: LABELS[stage], position: at + 1 },
     steps: STAGE_KEYS.map(status),
     planned_total: 30,
@@ -281,6 +285,11 @@ export function makeRow(over: Partial<OrderRow> & { id: number; style_name: stri
     finished_on: null,
     next_action: { stage: "making", what: "Final inspection", who: "qc", by: "2030-11-26", since: "2030-11-01" },
     flags: { late: false, waiting_for_owner: false, count_mismatch: false, fix_pieces_due: false },
+    image_url: null,
+    colour_code: null,
+    fabric_type: null,
+    print_supplier_name: null,
+    notes: null,
     ...over,
   };
 }

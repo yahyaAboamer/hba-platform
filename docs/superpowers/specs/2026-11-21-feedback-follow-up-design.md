@@ -58,7 +58,7 @@ nothing, and the platform shows no trace of the calls.
   edits or deletes an entry, and a mistake is corrected by a new note.
 - A support person cannot finish the job from a phone.
 
-## The rules (become ADR 0087, amending ADR 0083 decisions 4 and 6)
+## The rules (become ADR 0088, amending ADR 0083 decisions 4 and 6)
 
 A follow-up is **open** while the answer is *Not happy* and the survey's step
 is `support` (today's *Needs follow-up*). While it is open, a person can do
@@ -219,7 +219,7 @@ note*, and *Closed as couldn't reach* (date and who).
   - A shared `FollowUpDialog` and history component, used by the list and
     by `ChatFeedbackBlock`.
   - Feedback setup lists the new message.
-- **Docs.** ADR 0087, `docs/RULES.md` (Inbox feedback section), and the
+- **Docs.** ADR 0088, `docs/RULES.md` (Inbox feedback section), and the
   journal at `docs/design-refinement/feedback/JOURNAL.md`.
 
 ## Settled after the builder check (my calls)

@@ -252,7 +252,7 @@ payroll without touching a maintainer screen.
     she types is kept as a message.
   - An unhappy answer stays under *Needs follow-up* until a person resolves
     it; she is then asked whether it was solved, and *No* reopens it.
-  - Every follow-up keeps a history that nobody edits or deletes (ADR 0087):
+  - Every follow-up keeps a history that nobody edits or deletes (ADR 0088):
     each call with no answer, each note, *Resolved* (a note saying what was
     agreed is required) and *Couldn't reach*, with who and when.
   - After the 2nd unanswered call in a round the platform messages her once

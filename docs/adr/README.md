@@ -125,7 +125,7 @@ what was chosen.
 | [0084](0084-production-is-rebuilt-around-the-production-order.md) | Production is rebuilt around the production order, as platform screens with five sub-tabs | Accepted, built (batches 1 to 6); supersedes 0069's own look and 0076 decision 6; its carry-over of old records is superseded by 0085. |
 | [0085](0085-production-starts-from-zero.md) | Production starts from zero; the old tab and its records are removed (suppliers kept, backup file first) | Accepted, built. |
 | [0086](0086-the-production-manager-holds-all-of-production.md) | The production manager holds all of Production, money included; production staff (the QC manager) never sees money | Accepted, built. |
-| [0087](0087-a-follow-up-keeps-a-record-of-every-call.md) | A follow-up keeps a record of every call, note and close; after the 2nd unanswered call she is messaged once, and from the 3rd it can close as *Couldn't reach* | Accepted, being built; amends 0083 (4, 6) |
+| [0088](0088-a-follow-up-keeps-a-record-of-every-call.md) | A follow-up keeps a record of every call, note and close; after the 2nd unanswered call she is messaged once, and from the 3rd it can close as *Couldn't reach* | Accepted, being built; amends 0083 (4, 6) |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set

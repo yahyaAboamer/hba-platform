@@ -558,7 +558,7 @@ def feedback_list(
 @router.get("/feedback/follow-up")
 def feedback_follow_up_list(db: Session = Depends(get_session)) -> dict:
     """Every follow-up still open, longest waiting first, whatever the sheet's
-    filters say (ADR 0087). A test is never in it."""
+    filters say (ADR 0088). A test is never in it."""
     return {"rows": feedback.needs_follow_up(db), "reply_hours": feedback.reply_hours(db)}
 
 
@@ -618,7 +618,7 @@ def feedback_resolve(
     db: Session = Depends(get_session),
 ) -> dict:
     """A person has followed up an unhappy answer and says what was agreed
-    (ADR 0087). A day later she is asked whether it was solved. Returns the
+    (ADR 0088). A day later she is asked whether it was solved. Returns the
     survey as the sheet lists it. No note is refused in words."""
     note = body.note if body is not None else ""
     done = _answering(lambda: feedback_replies.resolve(db, survey_id, actor, note))
@@ -639,7 +639,7 @@ def feedback_no_answer(
     actor: UserAccount = Depends(GUARD),
     db: Session = Depends(get_session),
 ) -> dict:
-    """A person called her and she did not answer (ADR 0087). The second call
+    """A person called her and she did not answer (ADR 0088). The second call
     of a round queues the WhatsApp message; from the third it can be closed as
     couldn't reach. Returns the survey as the sheet lists it."""
     body = body or NoAnswerBody()

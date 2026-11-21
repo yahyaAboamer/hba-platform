@@ -7,7 +7,7 @@ import type { FeedbackRating, FeedbackRow, FollowUpEntry } from "../../lib/inbox
 import { clockTime, dayMonth } from "../../components/OpsSource";
 
 /**
- * The follow-up of an unhappy answer (ADR 0087): what has been done, how long
+ * The follow-up of an unhappy answer (ADR 0088): what has been done, how long
  * she has waited, and the three things a person can record. Shared by the
  * Feedback screen's *To follow up* list and the block beside her chat.
  *

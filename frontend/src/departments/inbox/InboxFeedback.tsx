@@ -21,7 +21,7 @@ import "./Inbox.css";
 
 /**
  * Inbox → Feedback: every answer to "how did your order go?" (ADR 0083,
- * decision 6), rebuilt around the follow-up (ADR 0087). Top to bottom: four
+ * decision 6), rebuilt around the follow-up (ADR 0088). Top to bottom: four
  * summary cards, *To follow up* (everyone still waiting on a person, whatever
  * the filters say), and *All answers*, the sheet.
  *

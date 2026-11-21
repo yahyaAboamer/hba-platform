@@ -34,6 +34,7 @@ from app.modules.production.orders.models import (
     STAGES,
     ProdDelivery,
     ProdDeliverySize,
+    ProdLibraryItem,
     ProdOrder,
     ProdOrderDateChange,
     ProdOrderFile,
@@ -539,6 +540,28 @@ def _printing(db: Session, printing: str, print_supplier_id: str | None, keep: s
     return None
 
 
+#: The details a new order takes from its product's Library record when the
+#: request leaves them out (ADR 0087). Never the COGS: the New order form fills
+#: the target cost from it, where the owner sees it.
+_FROM_LIBRARY = ("colour_code", "fabric_type", "decoration_type", "decoration_width_cm")
+
+
+def _from_library(db: Session, product_id: str | None, data: dict) -> dict:
+    """The request with each detail it left out (absent, null or blank) taken
+    from the product's Library record. What the request gives wins."""
+    if product_id is None:
+        return data
+    item = db.get(ProdLibraryItem, product_id)
+    if item is None:
+        return data
+    filled = dict(data)
+    for key in _FROM_LIBRARY:
+        given = data.get(key)
+        if given is None or (isinstance(given, str) and not given.strip()):
+            filled[key] = getattr(item, key)
+    return filled
+
+
 def create(db: Session, data: dict, actor: UserAccount) -> ProdOrder:
     style = _text(data.get("style_name"), limit=180, what="the style", required=True)
     colour = _text(data.get("colour"), limit=80, what="the colour", required=True)
@@ -552,12 +575,14 @@ def create(db: Session, data: dict, actor: UserAccount) -> ProdOrder:
     if target < today():
         raise Refused("The target date can't be in the past.")
     repeat = bool(data.get("repeat_run"))
+    product_id = _product(db, data.get("shopify_product_id"))
+    data = _from_library(db, product_id, data)
 
     order = ProdOrder(
         code=_next_code(db),
         style_name=style,
         colour=colour,
-        shopify_product_id=_product(db, data.get("shopify_product_id")),
+        shopify_product_id=product_id,
         factory_id=factory.id,
         fabric_bought_by=data["fabric_bought_by"],
         printing=data["printing"],
@@ -1719,7 +1744,29 @@ def _suppliers(db: Session, ids) -> dict[str, str]:
     return dict(db.execute(select(ProductionSupplier.id, ProductionSupplier.name).where(ProductionSupplier.id.in_(wanted))).all())
 
 
-def _row(facts: Facts, suppliers: dict[str, str], on: date) -> dict:
+def _images(db: Session, product_ids) -> dict[str, str]:
+    """The Shopify photo of each linked product that has one, so a row of the
+    order lists can show what the style looks like."""
+    wanted = {i for i in product_ids if i}
+    if not wanted:
+        return {}
+    return {
+        pid: url
+        for pid, url in db.execute(
+            select(Product.shopify_product_id, Product.image_url).where(Product.shopify_product_id.in_(wanted))
+        ).all()
+        if url
+    }
+
+
+def row_context(db: Session, orders: list[ProdOrder]) -> tuple[dict[str, str], dict[str, str]]:
+    """What :func:`_row` needs besides the order's facts: the names of every
+    factory and print house on the orders, and each linked product's photo."""
+    suppliers = _suppliers(db, [o.factory_id for o in orders] + [o.print_supplier_id for o in orders])
+    return suppliers, _images(db, [o.shopify_product_id for o in orders])
+
+
+def _row(facts: Facts, suppliers: dict[str, str], on: date, images: dict[str, str] | None = None) -> dict:
     order = facts.order
     # A cancelled or closed order is at no stage: it is not going anywhere.
     current = facts.current if order.status == "open" else None
@@ -1746,6 +1793,12 @@ def _row(facts: Facts, suppliers: dict[str, str], on: date) -> dict:
         "finished_on": _day(warehouse.done_on) if warehouse.status == "done" else None,
         "next_action": next_action(facts, on),
         "flags": flags(facts, on),
+        # The style's photo, and what else the lists' search box looks through.
+        "image_url": (images or {}).get(order.shopify_product_id or ""),
+        "colour_code": order.colour_code,
+        "fabric_type": order.fabric_type,
+        "print_supplier_name": suppliers.get(order.print_supplier_id) if order.print_supplier_id else None,
+        "notes": order.notes,
     }
 
 
@@ -1757,9 +1810,9 @@ def rows(db: Session, status: str) -> list[dict]:
         query = query.where(ProdOrder.status.in_(("closed", "cancelled"))).order_by(ProdOrder.updated_at.desc())
     orders = list(db.scalars(query))
     facts = _facts_for(db, orders)
-    suppliers = _suppliers(db, [o.factory_id for o in orders])
+    suppliers, images = row_context(db, orders)
     on = today()
-    return [_row(facts[order.id], suppliers, on) for order in orders]
+    return [_row(facts[order.id], suppliers, on, images) for order in orders]
 
 
 #: The role a purchase's part gives its supplier on the product.
@@ -1881,7 +1934,7 @@ def view(db: Session, order_id: int, *, with_money: bool) -> dict:
     warehouse = facts.stages["warehouse"]
     current = facts.current if order.status == "open" else None
     body = {
-        **_row(facts, suppliers, on),
+        **_row(facts, suppliers, on, _images(db, [order.shopify_product_id])),
         "shopify_product_id": order.shopify_product_id,
         "fabric_bought_by": order.fabric_bought_by,
         "printing": order.printing,

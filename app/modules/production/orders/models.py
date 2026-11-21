@@ -668,3 +668,78 @@ class ProdCutReport(Base):
     reported_at: Mapped[datetime] = _created()
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     replaced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# ── The Library (ADR 0087) ────────────────────────────────────────────────────
+
+#: What a Library file is: a design (any file), a size chart (a photo or PDF)
+#: or a pattern (any file).
+LIBRARY_FILE_KINDS = ("design", "size_chart", "pattern")
+
+
+class ProdLibraryItem(Base):
+    """What HBA types about one Shopify product (ADR 0087): its details, the
+    same four an order holds, notes, and its COGS in the five parts of a
+    piece's cost. What Shopify knows (title, status, photo, sizes, SKUs) stays
+    on ``product`` and is never copied here.
+
+    **The COGS is money**: read and changed only with ``production.owner``.
+    """
+
+    __tablename__ = "prod_library_item"
+    __table_args__ = (
+        CheckConstraint(
+            "decoration_width_cm IS NULL OR (decoration_width_cm > 0 AND decoration_width_cm <= 999.9)",
+            name="prod_library_item_decoration_width_range",
+        ),
+        *(
+            CheckConstraint(
+                f"cogs_{part}_piastres IS NULL OR cogs_{part}_piastres >= 0",
+                name=f"prod_library_item_cogs_{part}_not_negative",
+            )
+            for part in COST_PARTS
+        ),
+    )
+
+    shopify_product_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("product.shopify_product_id"), primary_key=True
+    )
+    #: The same lengths as an order's, so a Library value always fits an order.
+    colour_code: Mapped[str | None] = mapped_column(String(40))
+    fabric_type: Mapped[str | None] = mapped_column(String(120))
+    decoration_type: Mapped[str | None] = mapped_column(String(120))
+    decoration_width_cm: Mapped[Decimal | None] = mapped_column(Numeric(6, 1))
+    notes: Mapped[str | None] = mapped_column(Text)
+    cogs_fabric_piastres: Mapped[int | None] = mapped_column(BigInteger)
+    cogs_manufacturing_piastres: Mapped[int | None] = mapped_column(BigInteger)
+    cogs_printing_piastres: Mapped[int | None] = mapped_column(BigInteger)
+    cogs_accessories_piastres: Mapped[int | None] = mapped_column(BigInteger)
+    cogs_packaging_piastres: Mapped[int | None] = mapped_column(BigInteger)
+    updated_by: Mapped[int | None] = _user()
+    updated_at: Mapped[datetime] = _created()
+
+
+class ProdLibraryFile(Base):
+    """A design, size chart or pattern of a Library product, kept in the
+    platform's file bucket under ``production/library/{shopify_product_id}/``.
+    Taken off by ``deleted_at``; the stored copy stays."""
+
+    __tablename__ = "prod_library_file"
+    __table_args__ = (
+        CheckConstraint(f"kind IN ({_in(LIBRARY_FILE_KINDS)})", name="prod_library_file_kind_valid"),
+        CheckConstraint("size_bytes >= 0", name="prod_library_file_size_not_negative"),
+        Index("ix_prod_library_file_product", "shopify_product_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    shopify_product_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("product.shopify_product_id"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(12), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(300), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    uploaded_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

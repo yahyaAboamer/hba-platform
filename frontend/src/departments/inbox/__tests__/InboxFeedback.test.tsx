@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Inbox → Feedback (ADR 0083 decision 6, ADR 0087): four summary cards, the
+ * Inbox → Feedback (ADR 0083 decision 6, ADR 0088): four summary cards, the
  * *To follow up* list of everyone still waiting, and the sheet of every
  * answer. Every name, number, order and comment here is made up.
  */

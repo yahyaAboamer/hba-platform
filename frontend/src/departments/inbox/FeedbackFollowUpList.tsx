@@ -7,7 +7,7 @@ import { AnswerChip, Comment, reasonTitle } from "./FeedbackSheet";
 import { FollowUpActions, FollowUpHistory, WaitingClock, waitingWords } from "./FollowUp";
 
 /**
- * *To follow up* (ADR 0087): every unhappy answer still waiting on a person,
+ * *To follow up* (ADR 0088): every unhappy answer still waiting on a person,
  * longest-waiting first. It ignores the sheet's filters, because nobody
  * waiting may fall outside one, and it is not drawn at all when nobody waits.
  */

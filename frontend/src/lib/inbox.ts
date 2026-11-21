@@ -265,7 +265,7 @@ export type FeedbackReorder = "very_likely" | "maybe" | "unlikely";
 export type FeedbackStep = "rating" | "reason" | "comment" | "support" | "solved" | "reorder" | "done";
 export type FeedbackFollowUp = "needs_follow_up" | "resolved" | "reopened" | "unreached";
 
-// ── A follow-up's record (ADR 0087; services/feedback_follow_up.py) ────────
+// ── A follow-up's record (ADR 0088; services/feedback_follow_up.py) ────────
 
 /** What one history entry records. `message_*`, `wrote_back` and `returned` are the platform's own. */
 export type FollowUpKind =

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The follow-up of an unhappy answer (ADR 0087): its history, the waiting
+ * The follow-up of an unhappy answer (ADR 0088): its history, the waiting
  * clock and the three pop-ups. Every name, order and note here is made up.
  */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";

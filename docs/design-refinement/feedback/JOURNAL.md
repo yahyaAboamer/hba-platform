@@ -3,7 +3,7 @@
 **Started:** 2026-11-21 · **Branch:** `claude/feedbacks-ui-support-workflow-dc4b2f` from `main` at `8904e2d`
 **Scope:** Inbox → Feedback (`/inbox/feedback`), the Feedback block beside a chat, the follow-up pop-ups, the Feedback setup message list, the download.
 **Not in scope:** Today's items and the sidebar count. They read the same "open follow-up" rule and only lose *Couldn't reach* follow-ups.
-**Design and rules:** `docs/superpowers/specs/2026-11-21-feedback-follow-up-design.md`, ADR 0087.
+**Design and rules:** `docs/superpowers/specs/2026-11-21-feedback-follow-up-design.md`, ADR 0088.
 
 ---
 
