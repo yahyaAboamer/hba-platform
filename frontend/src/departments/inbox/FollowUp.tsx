@@ -151,11 +151,16 @@ export type FollowUpSurvey = {
   feedback_off?: boolean;
 };
 
-const PATHS: Record<FollowUpAction, string> = {
-  resolve: "resolve",
-  no_answer: "no-answer",
-  note: "note",
-};
+/**
+ * Each action's address written out whole, not built from parts:
+ * `tests/test_reachability.py` reads the interface for the addresses it calls,
+ * and an address assembled at run time is invisible to it.
+ */
+function send(action: FollowUpAction, id: number, body: object): Promise<FeedbackRow> {
+  if (action === "resolve") return api.post<FeedbackRow>(`/api/inbox/feedback/${id}/resolve`, body);
+  if (action === "no_answer") return api.post<FeedbackRow>(`/api/inbox/feedback/${id}/no-answer`, body);
+  return api.post<FeedbackRow>(`/api/inbox/feedback/${id}/note`, body);
+}
 
 /**
  * One pop-up for each action. It says what she will receive before anything
@@ -227,7 +232,7 @@ export function FollowUpDialog({
     const words = note.trim();
     const body = action === "no_answer" ? { note: words || null, close } : { note: words };
     try {
-      const updated = await api.post<FeedbackRow>(`/api/inbox/feedback/${survey.id}/${PATHS[action]}`, body);
+      const updated = await send(action, survey.id, body);
       onDone(updated);
       onClose();
     } catch (error) {
