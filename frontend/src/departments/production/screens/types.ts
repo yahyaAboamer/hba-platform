@@ -63,6 +63,13 @@ export type OrderRow = {
   finished_on: string | null;
   next_action: NextAction | null;
   flags: Flags;
+  /** The linked Shopify product's photo, when there is one. */
+  image_url: string | null;
+  colour_code: string | null;
+  fabric_type: string | null;
+  /** The outside print house's name, when the order is printed outside. */
+  print_supplier_name: string | null;
+  notes: string | null;
 };
 
 export type OrderStage = {

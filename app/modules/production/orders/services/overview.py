@@ -274,8 +274,8 @@ def overview(db: Session, *, with_money: bool) -> dict:
         db.scalars(select(ProdOrder).where(ProdOrder.status == "open").order_by(ProdOrder.delivery_date, ProdOrder.id))
     )
     facts = orders._facts_for(db, open_orders)
-    factories = orders._suppliers(db, [order.factory_id for order in open_orders])
-    rows = [orders._row(facts[order.id], factories, on) for order in open_orders]
+    factories, images = orders.row_context(db, open_orders)
+    rows = [orders._row(facts[order.id], factories, on, images) for order in open_orders]
     by_order = {row["id"]: row for row in rows}
 
     listed = tasks.listing(db)["tasks"]

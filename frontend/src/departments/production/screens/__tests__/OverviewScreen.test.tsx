@@ -250,15 +250,21 @@ describe("Problems right now", () => {
 });
 
 describe("Every order, and what happens next", () => {
-  it("shows each order's name, stage, pieces, step bar, next action, date and lateness", async () => {
+  it("shows each order's name, stage, pieces, step bar, next action, date and lateness, most urgent first", async () => {
     serve(overview());
     renderAt(ADDRESS, owner());
     const heading = await screen.findByRole("heading", { level: 2, name: "Every order, and what happens next" });
     const list = heading.parentElement as HTMLElement;
     const rows = within(list).getAllByRole("listitem");
     expect(rows).toHaveLength(3);
+    // The late order comes first; the others keep the server's order (nearest delivery first).
+    expect(rows.map((row) => within(row).getAllByRole("link")[0].textContent)).toEqual([
+      "Oversized hoodie · Off-white",
+      "Oversized hoodie · Black",
+      "Zip hoodie · Olive",
+    ]);
 
-    const first = rows[0];
+    const first = rows[1];
     const name = within(first).getByRole("link", { name: "Oversized hoodie · Black" });
     expect(hrefOf(name)).toBe("/production/orders/1");
     expect(within(first).getByText("9 of 10 · Warehouse receipt · 925 of 1,000 counted")).toBeTruthy();
@@ -267,13 +273,50 @@ describe("Every order, and what happens next", () => {
     const late = within(first).getByText("17 Nov · finished 6 days late");
     expect(late.className).toBe("prod-late");
 
-    expect(within(rows[1]).getByText("7 of 10 · Making · 300 of 985 shipped")).toBeTruthy();
-    expect(within(rows[1]).getByText("Next: final inspection · QC manager")).toBeTruthy();
-    expect(within(rows[1]).getByText("26 Nov · 6 days late").className).toBe("prod-late");
+    expect(within(rows[0]).getByText("7 of 10 · Making · 300 of 985 shipped")).toBeTruthy();
+    expect(within(rows[0]).getByText("Next: final inspection · QC manager")).toBeTruthy();
+    expect(within(rows[0]).getByText("26 Nov · 6 days late").className).toBe("prod-late");
 
     const owners = within(rows[2]).getByText("Next: approve the sample · Owner");
     expect(owners.className).toBe("prod-warn");
     expect(within(rows[2]).getByText("20 Dec · on time").className).toBe("");
+  });
+
+  it("shows five orders at a time, with rows per page and the next page", async () => {
+    const many = Array.from({ length: 7 }, (_, index) =>
+      makeRow({ id: 10 + index, style_name: `Style ${index + 1}`, colour: "Black" }),
+    );
+    serve(overview({ orders: many }));
+    renderAt(ADDRESS, owner());
+    const heading = await screen.findByRole("heading", { level: 2, name: "Every order, and what happens next" });
+    const list = heading.parentElement as HTMLElement;
+    const names = () => within(list).getAllByRole("listitem").map((row) => within(row).getAllByRole("link")[0].textContent);
+    expect(names()).toHaveLength(5);
+    const pager = within(list).getByRole("navigation", { name: "Pages" });
+    expect(within(pager).getByText("1–5 of 7")).toBeTruthy();
+
+    fireEvent.click(within(pager).getByRole("button", { name: "Next page" }));
+    expect(names()).toEqual(["Style 6 · Black", "Style 7 · Black"]);
+    expect(within(pager).getByText("6–7 of 7")).toBeTruthy();
+
+    fireEvent.change(within(pager).getByRole("combobox"), { target: { value: "10" } });
+    expect(names()).toHaveLength(7);
+    expect(within(pager).getByText("1–7 of 7")).toBeTruthy();
+  });
+
+  it("has no pager for five orders or fewer, and shows each style's photo", async () => {
+    const rows = orders();
+    rows[0] = { ...rows[0], image_url: "https://cdn.shopify.com/s/files/hoodie.png" };
+    serve(overview({ orders: rows }));
+    renderAt(ADDRESS, owner());
+    const heading = await screen.findByRole("heading", { level: 2, name: "Every order, and what happens next" });
+    const list = heading.parentElement as HTMLElement;
+    expect(within(list).queryByRole("navigation", { name: "Pages" })).toBeNull();
+    const photos = list.querySelectorAll("img.prod-photo");
+    expect(photos).toHaveLength(1);
+    expect(photos[0].getAttribute("src")).toBe("https://cdn.shopify.com/s/files/hoodie.png?width=96");
+    // The two orders without a photo keep an empty tile, so the rows line up.
+    expect(list.querySelectorAll("span.prod-photo--none")).toHaveLength(2);
   });
 
   it("names the pieces by how far the order has got", () => {

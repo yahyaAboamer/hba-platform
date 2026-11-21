@@ -1719,7 +1719,29 @@ def _suppliers(db: Session, ids) -> dict[str, str]:
     return dict(db.execute(select(ProductionSupplier.id, ProductionSupplier.name).where(ProductionSupplier.id.in_(wanted))).all())
 
 
-def _row(facts: Facts, suppliers: dict[str, str], on: date) -> dict:
+def _images(db: Session, product_ids) -> dict[str, str]:
+    """The Shopify photo of each linked product that has one, so a row of the
+    order lists can show what the style looks like."""
+    wanted = {i for i in product_ids if i}
+    if not wanted:
+        return {}
+    return {
+        pid: url
+        for pid, url in db.execute(
+            select(Product.shopify_product_id, Product.image_url).where(Product.shopify_product_id.in_(wanted))
+        ).all()
+        if url
+    }
+
+
+def row_context(db: Session, orders: list[ProdOrder]) -> tuple[dict[str, str], dict[str, str]]:
+    """What :func:`_row` needs besides the order's facts: the names of every
+    factory and print house on the orders, and each linked product's photo."""
+    suppliers = _suppliers(db, [o.factory_id for o in orders] + [o.print_supplier_id for o in orders])
+    return suppliers, _images(db, [o.shopify_product_id for o in orders])
+
+
+def _row(facts: Facts, suppliers: dict[str, str], on: date, images: dict[str, str] | None = None) -> dict:
     order = facts.order
     # A cancelled or closed order is at no stage: it is not going anywhere.
     current = facts.current if order.status == "open" else None
@@ -1746,6 +1768,12 @@ def _row(facts: Facts, suppliers: dict[str, str], on: date) -> dict:
         "finished_on": _day(warehouse.done_on) if warehouse.status == "done" else None,
         "next_action": next_action(facts, on),
         "flags": flags(facts, on),
+        # The style's photo, and what else the lists' search box looks through.
+        "image_url": (images or {}).get(order.shopify_product_id or ""),
+        "colour_code": order.colour_code,
+        "fabric_type": order.fabric_type,
+        "print_supplier_name": suppliers.get(order.print_supplier_id) if order.print_supplier_id else None,
+        "notes": order.notes,
     }
 
 
@@ -1757,9 +1785,9 @@ def rows(db: Session, status: str) -> list[dict]:
         query = query.where(ProdOrder.status.in_(("closed", "cancelled"))).order_by(ProdOrder.updated_at.desc())
     orders = list(db.scalars(query))
     facts = _facts_for(db, orders)
-    suppliers = _suppliers(db, [o.factory_id for o in orders])
+    suppliers, images = row_context(db, orders)
     on = today()
-    return [_row(facts[order.id], suppliers, on) for order in orders]
+    return [_row(facts[order.id], suppliers, on, images) for order in orders]
 
 
 #: The role a purchase's part gives its supplier on the product.
@@ -1881,7 +1909,7 @@ def view(db: Session, order_id: int, *, with_money: bool) -> dict:
     warehouse = facts.stages["warehouse"]
     current = facts.current if order.status == "open" else None
     body = {
-        **_row(facts, suppliers, on),
+        **_row(facts, suppliers, on, _images(db, [order.shopify_product_id])),
         "shopify_product_id": order.shopify_product_id,
         "fabric_bought_by": order.fabric_bought_by,
         "printing": order.printing,

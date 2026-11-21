@@ -142,6 +142,40 @@ describe("The Tasks screen", () => {
   });
 });
 
+describe("Searching tasks", () => {
+  it("finds tasks by title, who they wait on, their order, and a typed task's note and updates", async () => {
+    const list = tasks();
+    list[2] = makeManual({
+      id: 5, title: "Visit the new print house", due: "2030-11-13", group: "today", note: "Bring the Pantone book",
+      updates: [{ id: 1, text: "Called them, they open at ten", next_action: null, created_at: null, created_by: "Nour" }],
+    });
+    serve(list);
+    renderAt(ADDRESS, owner());
+    await screen.findByText("Approve the sample");
+    const box = screen.getByRole("searchbox", { name: /Search tasks/ });
+    const titles = () => screen.queryAllByRole("listitem").map((row) => row.querySelector("b")?.textContent);
+
+    fireEvent.change(box, { target: { value: "zip hoodie" } });
+    expect(titles()).toEqual(["Approve the sample", "Factory to send the changed sample"]);
+    expect(screen.getByText("2 open tasks match.")).toBeTruthy();
+
+    fireEvent.change(box, { target: { value: "pantone" } });
+    expect(titles()).toEqual(["Visit the new print house"]);
+    fireEvent.change(box, { target: { value: "open at ten" } });
+    expect(titles()).toEqual(["Visit the new print house"]);
+
+    fireEvent.change(box, { target: { value: "main factory" } });
+    expect(titles()).toEqual(["Receive 30 fix pieces", "Factory to send the changed sample"]);
+
+    fireEvent.change(box, { target: { value: "PO-2611-01" } });
+    expect(titles()).toEqual(["Record cut quantities"]);
+
+    fireEvent.change(box, { target: { value: "no such thing" } });
+    expect(screen.getByText("No open task matches.")).toBeTruthy();
+    expect(titles()).toHaveLength(0);
+  });
+});
+
 describe("The two purchase tasks", () => {
   const purchaseTasks = (): Task[] => [
     makeTask({

@@ -1407,3 +1407,38 @@ def test_the_production_manager_creates_settles_and_sees_the_money(owner):
     _to_cutting(manager, order["id"])
     seen = manager.get(f"/api/prod/orders/{order['id']}").json()["order"]
     assert "settlement" in seen
+
+
+# ── The photo and the search fields on a row (21 November 2026) ──────────────
+
+
+def test_a_row_carries_the_styles_photo_and_what_the_search_looks_through(owner):
+    with SessionLocal() as db:
+        db.get(Product, "111").image_url = "https://cdn.shopify.com/s/files/hoodie.png"
+        db.commit()
+    _new(
+        owner,
+        printing="outside",
+        print_supplier_id="prt",
+        colour_code="BLK-02",
+        fabric_type="Cotton fleece",
+        notes="Rush for the drop",
+    )
+    _new(owner, colour="Olive", shopify_product_id=None, style_name="A new style")
+
+    rows = {row["colour"]: row for row in owner.get("/api/prod/orders?status=open").json()["orders"]}
+    black, olive = rows["Black"], rows["Olive"]
+    assert black["image_url"] == "https://cdn.shopify.com/s/files/hoodie.png"
+    assert black["colour_code"] == "BLK-02"
+    assert black["fabric_type"] == "Cotton fleece"
+    assert black["print_supplier_name"] == "Print house A"
+    assert black["notes"] == "Rush for the drop"
+    # A style not on Shopify yet has no photo, and an order printed at the factory no print house.
+    assert olive["image_url"] is None
+    assert olive["print_supplier_name"] is None
+
+    # The Overview's rows and one order's page say the same.
+    overview_rows = {row["colour"]: row for row in owner.get("/api/prod/overview").json()["orders"]}
+    assert overview_rows["Black"]["image_url"] == black["image_url"]
+    page = owner.get(f"/api/prod/orders/{black['id']}").json()["order"]
+    assert page["image_url"] == black["image_url"]
