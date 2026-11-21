@@ -87,6 +87,15 @@ FEEDBACK_REORDERS = ("very_likely", "maybe", "unlikely")
 #: reason, her words, a person (an unhappy answer), her tap on *Was your issue
 #: solved?*, her tap on how likely she is to order again, or nothing.
 FEEDBACK_STEPS = ("rating", "reason", "comment", "support", "solved", "reorder", "done")
+#: What one line of a follow-up's history records (ADR 0087). A person's:
+#: a call with no answer, a note, *Resolved* (with what was agreed), and
+#: *Couldn't reach*. The platform's: the WhatsApp message after the second
+#: unanswered call, sent or not; she wrote back after *Couldn't reach*; and
+#: the follow-up came back because *Was your issue solved?* could not be sent.
+FOLLOW_UP_KINDS = (
+    "no_answer", "note", "resolved", "unreached",
+    "message_sent", "message_failed", "wrote_back", "returned",
+)
 
 
 def _in(column: str, values: tuple[str, ...]) -> str:
@@ -424,6 +433,7 @@ class FeedbackSurvey(Base):
         CheckConstraint(_in("step", FEEDBACK_STEPS), name="feedback_survey_step_valid"),
         CheckConstraint("attempts >= 0", name="feedback_survey_attempts_not_negative"),
         CheckConstraint("reopened_count >= 0", name="feedback_survey_reopened_not_negative"),
+        CheckConstraint("follow_up_round >= 0", name="feedback_survey_round_not_negative"),
         # What the sender picks up next.
         Index(
             "feedback_survey_due",
@@ -505,6 +515,21 @@ class FeedbackSurvey(Base):
     solved: Mapped[bool | None] = mapped_column(Boolean)
     solved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reopened_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    #: Which round of follow-up this is (ADR 0087). A round starts when she
+    #: answers *Not happy* (round 0), when she says *No, not solved*, and when
+    #: she writes back after *Couldn't reach*. The no-answer count and the
+    #: tried-to-call message are per round; ``reopened_count`` keeps its one
+    #: meaning (she said *No*) and its limit on *Resolved*.
+    follow_up_round: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    #: When this round started: what the waiting clock runs from. Calls and
+    #: notes do not restart it - the promise is to reach her, not to try.
+    round_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Closed as *Couldn't reach*, and by whom. Cleared if she writes back
+    #: within 14 days (the history keeps the close).
+    unreached_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    unreached_by: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
 
     # Her reward: one code inside the platform's one Shopify discount.
     #: Unique among surveys. Shopify treats codes without regard to case; ours
@@ -537,6 +562,40 @@ class FeedbackSurvey(Base):
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class FeedbackFollowUp(Base):
+    """One line of an unhappy answer's follow-up history (ADR 0087): a call
+    with no answer, a note, *Resolved*, *Couldn't reach*, or something the
+    platform did on its own.
+
+    **Append-only.** Nothing edits or deletes a row: it is a record of what
+    happened, and a mistake is put right by a new note. ``round`` is the
+    survey's ``follow_up_round`` when it was written; ``actor_id`` is null for
+    the platform.
+    """
+
+    __tablename__ = "feedback_follow_up"
+    __table_args__ = (
+        CheckConstraint(_in("kind", FOLLOW_UP_KINDS), name="feedback_follow_up_kind_valid"),
+        CheckConstraint("round >= 0", name="feedback_follow_up_round_not_negative"),
+        # A survey's history, oldest first.
+        Index("feedback_follow_up_survey", "survey_id", "at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    survey_id: Mapped[int] = mapped_column(
+        ForeignKey("feedback_survey.id", ondelete="CASCADE"), nullable=False
+    )
+    round: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+    actor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
+    at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
 

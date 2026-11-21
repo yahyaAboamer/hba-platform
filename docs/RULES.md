@@ -252,6 +252,16 @@ payroll without touching a maintainer screen.
     she types is kept as a message.
   - An unhappy answer stays under *Needs follow-up* until a person resolves
     it; she is then asked whether it was solved, and *No* reopens it.
+  - Every follow-up keeps a history that nobody edits or deletes (ADR 0087):
+    each call with no answer, each note, *Resolved* (a note saying what was
+    agreed is required) and *Couldn't reach*, with who and when.
+  - After the 2nd unanswered call in a round the platform messages her once
+    on WhatsApp: a chat message if her 24 hours are open, else the approved
+    template `feedback_tried_to_call`. A failed send is not retried; the
+    history tells the team to write to her.
+  - From the 3rd unanswered call it can be closed as *Couldn't reach*: she
+    is not asked whether it was solved and gets no code. A message she types
+    within 14 days opens it again, as a new round.
   - Everyone who finishes gets her own 20% code, once, inside the one
     *Feedback 20%* discount. The platform also writes to Shopify for this,
     through the second app. An unused code is deleted after 30 days.
