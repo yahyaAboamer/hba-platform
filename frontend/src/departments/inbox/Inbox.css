@@ -216,6 +216,39 @@
 .inbox-fb-block__said { white-space:pre-wrap; }
 .inbox-fb-block .inbox-setstatus { margin-top:10px; }
 
+/* ── A follow-up's record, clock and pop-ups (ADR 0087; FollowUp.tsx) ──── */
+.inbox-fu-heading { margin:14px 0 6px; font-size:13px; }
+.inbox-fu-history ul { margin:0; padding:0; list-style:none; font-size:12.5px; line-height:1.45; }
+.inbox-fu-entry { position:relative; margin-bottom:6px; padding-left:14px; color:var(--quiet); overflow-wrap:anywhere; }
+.inbox-fu-entry::before { content:""; position:absolute; left:0; top:6px; width:6px; height:6px; border-radius:50%; background:var(--rule-strong); }
+.inbox-fu-entry--platform::before { background:var(--accent); }
+.inbox-fu-entry b { color:var(--ink); font-weight:500; }
+.inbox-fu-entry--owed, .inbox-fu-entry--owed b { color:var(--owed); }
+.inbox-fu-entry--owed::before { background:var(--owed); }
+/* Her words or a colleague's, in whatever script: their own direction, kept line breaks, never wider than the card. */
+.inbox-fu-note { display:block; margin-top:2px; color:var(--ink); white-space:pre-wrap; overflow-wrap:anywhere; unicode-bidi:plaintext; }
+.inbox-fu-history__more { display:inline-block; margin-top:2px; font-size:12.5px; }
+.inbox-fu-clock { font-size:12.5px; color:var(--owed); }
+.inbox-fu-clock--late { color:var(--refused); font-weight:600; }
+.inbox-fu-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.inbox-fu-actions .inbox-btn { flex:1 1 auto; }
+
+.inbox-fu-layer { position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:16px; }
+.inbox-fu-scrim { position:absolute; inset:0; border:0; background:var(--scrim); cursor:default; }
+.inbox-fu-dialog { position:relative; width:100%; max-width:460px; max-height:calc(100dvh - 32px); padding:18px 20px; overflow-y:auto; border-radius:var(--radius-lg); background:var(--raise); color:var(--ink); box-shadow:0 18px 50px rgba(0,0,0,.3); }
+.inbox-fu-dialog__title { margin:0; font-size:17px; overflow-wrap:anywhere; }
+.inbox-fu-dialog__sub { margin:4px 0 0; font-size:13px; color:var(--quiet); overflow-wrap:anywhere; }
+.inbox-fu-field { display:block; margin:14px 0 5px; font-size:13px; font-weight:600; }
+.inbox-fu-req { color:var(--refused); }
+.inbox-fu-textarea { display:block; min-height:72px; resize:vertical; font:inherit; font-size:14px; line-height:1.45; }
+.inbox-fu-count { margin:4px 0 0; font-size:12px; color:var(--quiet); text-align:right; }
+.inbox-fu-hint { margin:12px 0 0; padding:8px 10px; border:1px solid var(--rule); border-radius:var(--radius); background:var(--surface); color:var(--quiet); font-size:12.5px; line-height:1.45; }
+.inbox-fu-hint--owed { border-color:transparent; background:var(--owed-quiet); color:var(--owed); }
+.inbox-fu-check { display:flex; align-items:flex-start; gap:8px; margin-top:12px; font-size:13px; line-height:1.45; }
+.inbox-fu-check input { flex:none; width:18px; height:18px; margin:1px 0 0; }
+.inbox-fu-problem { margin:12px 0 0; }
+.inbox-fu-dialog__acts { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:16px; }
+
 /* ── Feedback: the sheet of every answer (ADR 0083) ────────────────────── */
 /* A compact version of Confirmations' cards: nine numbers, not nine panels. */
 .inbox-fb__headacts { display:flex; flex-wrap:wrap; gap:8px; }
@@ -271,6 +304,13 @@
   .inbox-fb__filters .field:nth-last-of-type(-n+2) { grid-column:1 / -1; }
   .inbox-fb__clear, .inbox-fb__download, .inbox-fb__headacts .inbox-btn { min-height:44px; }
   .inbox-fb-block .inbox-btn { min-height:44px; }
+  /* A finger needs 44px, and 16px stops the phone zooming into the note. */
+  .inbox-fu-actions .inbox-btn, .inbox-fu-dialog__acts .inbox-btn, .inbox-fu-history__more { min-height:44px; }
+  .inbox-fu-textarea { font-size:16px; }
+  .inbox-fu-check { min-height:44px; }
+  .inbox-fu-layer { align-items:end; padding:0; }
+  .inbox-fu-dialog { max-width:none; max-height:92dvh; border-radius:var(--radius-lg) var(--radius-lg) 0 0; padding:18px 16px calc(16px + env(safe-area-inset-bottom)); }
+  .inbox-fu-dialog__acts .inbox-btn { flex:1 1 0; }
   .inbox-fb .ops-foot { padding:6px 14px; }
   .inbox-fb__foot .ops-linkbtn, .inbox-fb__more { min-height:44px; padding:0 4px; }
   .inbox-fb .inbox-notice { margin:12px 14px; }

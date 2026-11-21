@@ -36,6 +36,7 @@ const FOLLOW_UP_WORDS: Record<FeedbackFollowUp, string> = {
   needs_follow_up: "Needs follow-up",
   resolved: "Resolved",
   reopened: "Reopened",
+  unreached: "Couldn't reach",
 };
 
 /** The sheet opens on the last 30 days: today and the 29 before it. */

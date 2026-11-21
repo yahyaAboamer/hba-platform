@@ -80,7 +80,7 @@ export function ChatOrderPanel({
   // below the order's own confirmation, where it is only read.
   const waiting = feedback !== null && feedback.needs_follow_up;
   const feedbackBlock = feedback && (
-    <ChatFeedbackBlock feedback={feedback} now={now} late={!waiting} onResolved={onAnswered} />
+    <ChatFeedbackBlock feedback={feedback} now={now} late={!waiting} onChanged={onAnswered} />
   );
 
   if (!order) {
