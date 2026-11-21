@@ -110,8 +110,9 @@ TEMPLATES = (
         "body": "We tried to call you about your order {{1}}. Reply here or tell us a good time to call.",
         "buttons": [],
         "note": (
-            "Submit it to Meta in WhatsApp Manager. Until Meta approves it, a customer whose "
-            "24 hours have closed is not messaged and the chat tells your team to write to her."
+            "Approved by Meta (22 November 2026). It can only be changed in Meta's WhatsApp "
+            "Manager, and Meta has to approve it again. It is sent instead of the chat message "
+            "when her 24 hours have closed."
         ),
     },
 )
