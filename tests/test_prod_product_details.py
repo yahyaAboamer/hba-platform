@@ -13,6 +13,7 @@ from sqlalchemy import select, text
 from app.db import SessionLocal, engine
 from app.shared.models.audit import AuditEvent
 from app.shared.models.catalogue import Product
+from tests.conftest import alembic_head
 from tests.test_prod_orders import (  # noqa: F401  (fixtures)
     PNG,
     _all_the_way,
@@ -304,7 +305,7 @@ def test_the_migration_goes_down_and_up_cleanly_when_empty(fresh_database):
             assert connection.execute(text("SELECT to_regclass('uq_prod_supplier_receipt_live')")).scalar_one() is not None
     finally:
         command.upgrade(config, "head")
-    assert _version() == "f1c2d3e40039"
+    assert _version() == alembic_head()
     with engine.connect() as connection:
         assert connection.execute(text("SELECT to_regclass('prod_task_update')")).scalar_one() is not None
         assert connection.execute(text("SELECT to_regclass('uq_prod_supplier_receipt_live')")).scalar_one() is None
@@ -317,4 +318,4 @@ def test_the_downgrade_refuses_while_a_product_detail_exists(owner):
     _new(owner, fabric_type="Jersey")
     with pytest.raises(RuntimeError, match="product details"):
         command.downgrade(Config("alembic.ini"), "e5b9a3d70038")
-    assert _version() == "f1c2d3e40039"
+    assert _version() == alembic_head()

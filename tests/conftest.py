@@ -115,6 +115,15 @@ def fresh_database():
     empty_the_database()
 
 
+def alembic_head() -> str:
+    """The newest migration. A test that checks a refused downgrade left the
+    database where it was asks for this, rather than naming a revision that the
+    next migration on any branch makes stale."""
+    from alembic.script import ScriptDirectory
+
+    return ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
+
+
 def empty_the_database() -> None:
     """Delete every row, keep the schema.
 

@@ -13,6 +13,7 @@ from sqlalchemy import text
 
 from app.db import Base, engine
 from app.main import app
+from tests.conftest import alembic_head
 
 #: The old app's tables, children first (the order the migration drops them).
 OLD_TABLES = (
@@ -117,7 +118,7 @@ def test_the_downgrade_recreates_the_old_tables_empty_and_the_upgrade_drops_them
     assert not set(OLD_TABLES) & _tables()
     assert _supplier_keys() == keys_before
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "f1c2d3e40039"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == alembic_head()
         assert connection.execute(text("SELECT name FROM production_supplier")).scalar_one() == "Kept workshop"
         assert connection.execute(text("SELECT count(*) FROM production_supplier_category")).scalar_one() == 1
 
