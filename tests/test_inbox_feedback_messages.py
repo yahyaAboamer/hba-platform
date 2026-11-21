@@ -439,7 +439,7 @@ def test_the_unhappy_path_to_the_end_says_the_edited_words_in_every_message(db, 
     tap_list(db, row, "wrong_item", "wamid.U2")
     assert _bodies(world.asked)[-1] == "Sorry Yahya. We reply in 24 hours."
 
-    feedback_replies.resolve(db, row.id, world.owner)
+    feedback_replies.resolve(db, row.id, world.owner, "Agreed an exchange")
     feedback_replies._handle_ask_solved(db, {"survey_id": row.id})
     asked = world.asked[-1]
     assert asked["interactive"]["body"] == {"text": "Did we fix it?"}
@@ -484,7 +484,7 @@ def test_the_approved_message_keeps_its_own_buttons_whatever_the_chat_ones_say(d
     row = the_test(db)
     tap_rating(db, row, "unhappy", "wamid.U1")
     tap_list(db, row, "size_fit", "wamid.U2")
-    feedback_replies.resolve(db, row.id, world.owner)
+    feedback_replies.resolve(db, row.id, world.owner, "Agreed an exchange")
     db.get(InboxConversation, row.conversation_id).last_inbound_at = utcnow() - timedelta(hours=30)
     db.flush()
     feedback_replies._handle_ask_solved(db, {"survey_id": row.id})
@@ -514,7 +514,7 @@ def _not_solved(db, world, *, wamid="wamid.U3", before_tap=lambda: None):
     row = the_test(db)
     tap_rating(db, row, "unhappy", "wamid.U1")
     tap_list(db, row, "size_fit", "wamid.U2")
-    feedback_replies.resolve(db, row.id, world.owner)
+    feedback_replies.resolve(db, row.id, world.owner, "Agreed an exchange")
     feedback_replies._handle_ask_solved(db, {"survey_id": row.id})
     asked_before = len(world.asked)
     before_tap()

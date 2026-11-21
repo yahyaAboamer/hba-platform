@@ -598,15 +598,23 @@ def feedback_download(
     )
 
 
+class FollowUpNoteBody(BaseModel):
+    #: What was agreed with her, or the note. Checked in ``feedback_follow_up``.
+    note: str = ""
+
+
 @router.post("/feedback/{survey_id}/resolve")
 def feedback_resolve(
     survey_id: int,
+    body: FollowUpNoteBody | None = None,
     actor: UserAccount = Depends(GUARD),
     db: Session = Depends(get_session),
 ) -> dict:
-    """A person has followed up an unhappy answer. A day later she is asked
-    whether it was solved. Returns the survey as the sheet lists it."""
-    done = _answering(lambda: feedback_replies.resolve(db, survey_id, actor))
+    """A person has followed up an unhappy answer and says what was agreed
+    (ADR 0087). A day later she is asked whether it was solved. Returns the
+    survey as the sheet lists it. No note is refused in words."""
+    note = body.note if body is not None else ""
+    done = _answering(lambda: feedback_replies.resolve(db, survey_id, actor, note))
     db.commit()
     return done
 

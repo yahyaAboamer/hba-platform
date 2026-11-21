@@ -287,7 +287,7 @@ def test_the_unhappy_path_asks_was_it_solved_after_a_minute_then_reorder_then_a_
     )
 
     before = utcnow()
-    feedback_replies.resolve(db, row.id, world.owner)
+    feedback_replies.resolve(db, row.id, world.owner, "Agreed an exchange")
     assert row.step == "solved"
     [(_, run_after)] = [
         (kind, when)
@@ -487,7 +487,7 @@ def test_the_chat_shows_the_test_with_its_label_and_resolved_works(db, world):
     assert block["is_test"] is True
     assert (block["order_name"], block["rating"], block["needs_follow_up"]) == ("TEST", "unhappy", True)
 
-    done = feedback_replies.resolve(db, row.id, world.owner)
+    done = feedback_replies.resolve(db, row.id, world.owner, "Agreed an exchange")
     assert done["step"] == "solved" and done["resolved_at"]
     block = chats.conversation_detail(db, row.conversation_id)["feedback"]
     assert block["resolved_at"] and block["needs_follow_up"] is False

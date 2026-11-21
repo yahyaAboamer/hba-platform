@@ -342,7 +342,7 @@ def test_resolving_is_audited_and_asks_her_a_day_later(db, world):
     mariam = world.staff
     now = utcnow()
 
-    described = feedback_replies.resolve(db, row.id, mariam, now)
+    described = feedback_replies.resolve(db, row.id, mariam, "Agreed an exchange", now)
 
     assert (row.step, row.resolved_by, row.resolved_at) == ("solved", mariam.id, now)
     assert described["resolved_by_name"] == "Mariam" and not described["needs_follow_up"]
@@ -362,18 +362,18 @@ def test_only_an_unhappy_answer_waiting_for_a_person_can_be_resolved(db, world):
     mariam = world.staff
     row = world.row
     with pytest.raises(chats.Refused):
-        feedback_replies.resolve(db, row.id, mariam)  # not rated yet
+        feedback_replies.resolve(db, row.id, mariam, "Agreed an exchange")  # not rated yet
     row.rating, row.step = "loved", "support"
     db.flush()
     with pytest.raises(chats.Refused):
-        feedback_replies.resolve(db, row.id, mariam)  # not unhappy
+        feedback_replies.resolve(db, row.id, mariam, "Agreed an exchange")  # not unhappy
     with pytest.raises(chats.NotFound):
-        feedback_replies.resolve(db, 987654, mariam)
+        feedback_replies.resolve(db, 987654, mariam, "Agreed an exchange")
     row.rating = "unhappy"
     db.flush()
-    feedback_replies.resolve(db, row.id, mariam)
+    feedback_replies.resolve(db, row.id, mariam, "Agreed an exchange")
     with pytest.raises(chats.Refused):
-        feedback_replies.resolve(db, row.id, mariam)  # twice
+        feedback_replies.resolve(db, row.id, mariam, "Agreed an exchange")  # twice
     assert len(jobs(db, JobKind.INBOX_FEEDBACK_ASK_SOLVED)) == 1
 
 
@@ -388,7 +388,7 @@ def _ask(db, row, world, **kw):
 
 def _resolved(world, db):
     row = _unhappy_waiting_for_a_person(world, db)
-    feedback_replies.resolve(db, row.id, world.staff)
+    feedback_replies.resolve(db, row.id, world.staff, "Agreed an exchange")
     return row
 
 
@@ -523,7 +523,7 @@ def test_after_the_second_resolve_she_is_asked_once_more_and_after_the_third_not
     apply(db, interactive_tap("button_reply", f"fbs_no_{row.id}", "No", "wamid.S1", ago=timedelta(seconds=30)))
 
     later = utcnow() + timedelta(hours=1)
-    feedback_replies.resolve(db, row.id, mariam, later)
+    feedback_replies.resolve(db, row.id, mariam, "Agreed an exchange", later)
     assert row.step == "solved"
     _ask(db, row, world)
     assert row.solved_asked_at is not None
@@ -534,7 +534,7 @@ def test_after_the_second_resolve_she_is_asked_once_more_and_after_the_third_not
     assert (row.step, row.reopened_count) == ("support", 2)
 
     sent = len(world.asked)
-    feedback_replies.resolve(db, row.id, mariam, later + timedelta(hours=1))
+    feedback_replies.resolve(db, row.id, mariam, "Agreed an exchange", later + timedelta(hours=1))
     assert row.step == "done" and row.resolved_at is not None
     assert len(jobs(db, JobKind.INBOX_FEEDBACK_ASK_SOLVED)) == 2
     _ask(db, row, world)
@@ -741,7 +741,7 @@ def test_a_refusal_that_will_not_change_sends_her_back_to_a_person_and_can_be_as
     assert [r["id"] for r in feedback.needs_follow_up(db)] == [row.id]
 
     # A person follows up and presses Resolved again; this time it goes.
-    feedback_replies.resolve(db, row.id, world.staff, utcnow() + timedelta(hours=1))
+    feedback_replies.resolve(db, row.id, world.staff, "Agreed an exchange", utcnow() + timedelta(hours=1))
     sent = len(world.asked)
     _ask(db, row, world, client=world.client, now=utcnow() + timedelta(hours=25))
     assert len(world.asked) == sent + 1 and row.solved_asked_at is not None and row.step == "solved"

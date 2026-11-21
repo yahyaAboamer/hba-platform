@@ -469,6 +469,7 @@ def test_between_them_the_lanes_take_every_kind_and_only_one_tops_up():
         JobKind.INBOX_FEEDBACK_SEND,
         JobKind.INBOX_FEEDBACK_REPLY,
         JobKind.INBOX_FEEDBACK_ASK_SOLVED,
+        JobKind.INBOX_FEEDBACK_TRIED_TO_CALL,
         JobKind.INBOX_FEEDBACK_EXPIRE_CODES,
     }
     # Every kind named for the inbox runs in the inbox lane.

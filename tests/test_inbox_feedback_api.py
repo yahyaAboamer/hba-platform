@@ -411,9 +411,11 @@ def test_an_empty_download_is_still_a_sheet(client, sheet):
 
 # ── Resolved ──────────────────────────────────────────────────────────────────
 
+AGREED = {"note": "Exchange to size L agreed"}
+
 
 def test_resolved_marks_the_follow_up_and_says_who(client, sheet):
-    response = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
+    response = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED)
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["resolved_by_name"] == "Owner" and body["resolved_at"]
@@ -423,14 +425,18 @@ def test_resolved_marks_the_follow_up_and_says_who(client, sheet):
 
 
 def test_resolved_is_refused_in_words(client, sheet):
-    assert client.post("/api/inbox/feedback/999999/resolve").status_code == 404
+    assert client.post("/api/inbox/feedback/999999/resolve", json=AGREED).status_code == 404
     # Not unhappy.
-    refused = client.post(f"/api/inbox/feedback/{sheet['loved']}/resolve")
+    refused = client.post(f"/api/inbox/feedback/{sheet['loved']}/resolve", json=AGREED)
     assert refused.status_code == 422
     assert "unhappy" in refused.json()["detail"]
+    # No note: nothing is resolved (ADR 0087).
+    bare = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
+    assert bare.status_code == 422
+    assert bare.json()["detail"] == "Write what you agreed with her before resolving."
     # Already resolved: pressed twice.
-    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve").status_code == 200
-    again = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
+    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED).status_code == 200
+    again = client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED)
     assert again.status_code == 422
 
 
@@ -522,7 +528,7 @@ def test_the_chips_count_follow_up(client, sheet):
     counts = client.get("/api/inbox/conversations").json()["counts"]
     assert counts == {"all": 5, "unread": 0, "edit": 0, "follow_up": 2}
     # Resolving takes the chat out of the chip and the view.
-    client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
+    client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED)
     assert client.get("/api/inbox/conversations").json()["counts"]["follow_up"] == 1
     assert _view(client, "follow_up") == ["Mona Fathy"]
 
@@ -555,7 +561,7 @@ def test_today_is_quiet_when_nobody_is_waiting(client):
 
 
 def test_a_single_one_is_worded_in_the_singular(client, sheet):
-    client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve")
+    client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED)
     items = {i["key"]: i for i in client.get("/api/today").json()["items"]}
     assert items["inbox.feedback_follow_up"]["what"] == "1 unhappy customer needs a follow-up"
 
@@ -645,7 +651,7 @@ def test_customer_service_lists_downloads_and_resolves_but_never_changes_setting
     assert client.get("/api/inbox/feedback").status_code == 200
     assert client.get("/api/inbox/feedback/download").status_code == 200
     assert client.get("/api/inbox/feedback/settings").status_code == 200
-    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve").status_code == 200
+    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED).status_code == 200
     assert client.put("/api/inbox/feedback/settings", json={"reply_hours": 12}).status_code == 403
     assert client.get("/api/inbox/conversations", params={"view": "follow_up"}).status_code == 200
 
@@ -656,7 +662,7 @@ def test_a_role_without_the_inbox_gets_nothing(client, sheet, role):
     assert client.get("/api/inbox/feedback").status_code == 403
     assert client.get("/api/inbox/feedback/download").status_code == 403
     assert client.get("/api/inbox/feedback/settings").status_code == 403
-    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve").status_code == 403
+    assert client.post(f"/api/inbox/feedback/{sheet['unhappy']}/resolve", json=AGREED).status_code == 403
     assert client.put("/api/inbox/feedback/settings", json={"reply_hours": 12}).status_code == 403
     assert client.get("/api/inbox/conversations", params={"view": "neutral"}).status_code == 403
 

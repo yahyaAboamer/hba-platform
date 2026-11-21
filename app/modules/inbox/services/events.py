@@ -330,6 +330,11 @@ def apply_message(db: Session, message: dict, names: dict[str, str]) -> bool:
     elif fields["kind"] == "text":
         # Her first words after a feedback answer are her comment.
         feedback_replies.capture_comment(db, phone, fields["body"], occurred_at)
+        # She wrote back after a follow-up was closed as couldn't reach: a
+        # person has her again (ADR 0087). A tap never gets here.
+        from app.modules.inbox.services import feedback_follow_up
+
+        feedback_follow_up.reopen_if_unreached(db, phone, occurred_at)
 
     # She wrote: free replies are allowed for 24 hours from now.
     if conversation.last_inbound_at is None or occurred_at > conversation.last_inbound_at:
