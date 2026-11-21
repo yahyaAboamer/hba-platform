@@ -159,7 +159,8 @@ function FileGroup({
           <ul className="prod-filelist">
             {files.map((file) => (
               <li key={file.id}>
-                <a href={file.url} target="_blank" rel="noopener noreferrer">
+                <a href={`/api/prod/library-files/${file.id}`} target="_blank" rel="noopener noreferrer">
+                  {file.mime_type.startsWith("image/") && <img className="prod-lib-thumb" src={`/api/prod/library-files/${file.id}`} alt="" loading="lazy" />}
                   {file.name}
                 </a>
                 {file.uploaded_by && <span className="prod-small"> · {file.uploaded_by}</span>}
@@ -408,13 +409,13 @@ export function LibraryPage({ session }: { session: Session }) {
               confirming={confirming}
               onAdd={(which, file) =>
                 void fileWrite(
-                  () => api.upload(`${address}/files`, file, { fields: { kind: which } }),
+                  () => api.upload(`/api/prod/library/${encodeURIComponent(item.id)}/files`, file, { fields: { kind: which } }),
                   `${FILE_WORDS[which].title.replace(/s$/, "")} added: ${file.name}.`,
                 )
               }
               onAskRemove={(file) => setConfirming(file.id)}
               onKeep={() => setConfirming(null)}
-              onRemove={(file) => void fileWrite(() => api.del(file.url), `Removed: ${file.name}.`)}
+              onRemove={(file) => void fileWrite(() => api.del(`/api/prod/library-files/${file.id}`), `Removed: ${file.name}.`)}
             />
           ))}
         </dl>
