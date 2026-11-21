@@ -249,19 +249,75 @@
 .inbox-fu-problem { margin:12px 0 0; }
 .inbox-fu-dialog__acts { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:16px; }
 
-/* ── Feedback: the sheet of every answer (ADR 0083) ────────────────────── */
-/* A compact version of Confirmations' cards: nine numbers, not nine panels. */
+/* ── Feedback: four cards, To follow up, and the sheet (ADR 0083, 0087) ─── */
 .inbox-fb__headacts { display:flex; flex-wrap:wrap; gap:8px; }
-.inbox-fb__tiles { grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; }
-.inbox-fb__tile { min-height:0; padding:12px 14px 10px; }
-.inbox-fb__tile .ops-tile__value { margin:4px 0 0; font-size:26px; }
-.inbox-fb__tile[aria-pressed="true"] { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
-.inbox-fb__tile--static, .inbox-fb__tile--static:hover { border-color:transparent; cursor:default; }
-.inbox-fb__filters { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:4px 14px; align-items:end; padding:14px 18px 6px; border-bottom:1px solid var(--rule); }
-.inbox-fb__filters .field { min-width:0; margin-bottom:8px; }
+
+/* The four cards: the bar gets the room it needs. */
+.ops-tiles.inbox-fb__tiles { grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr); gap:12px; }
+.inbox-fb__tile { min-height:0; padding:14px 16px 12px; }
+.inbox-fb__tile .ops-tile__value { margin:6px 0 4px; font-size:28px; }
+div.inbox-fb__tile, div.inbox-fb__tile:hover { border-color:transparent; cursor:default; }
+.inbox-fb__of { margin-left:2px; font-size:15px; letter-spacing:0; color:var(--quiet); }
+.inbox-fb__tile--owed, div.inbox-fb__tile--owed:hover { border-color:var(--owed); }
+.inbox-fb__tile--owed .ops-tile__value { color:var(--owed); }
+button.inbox-fb__tile--owed:hover { box-shadow:inset 0 0 0 1px var(--owed); }
+.inbox-fb__late { color:var(--refused); }
+.inbox-fb__bar { display:flex; align-self:stretch; height:10px; margin-top:14px; overflow:hidden; border-radius:999px; background:var(--hover); }
+.inbox-fb__bar > span { display:block; min-width:0; }
+.inbox-fb__bar-loved { background:var(--accent); }
+.inbox-fb__bar-okay { background:var(--rule-strong); }
+/* The light grey of the light theme is near-black on the dark one. */
+[data-theme="dark"] .inbox-fb__bar-okay { background:var(--faint); }
+.inbox-fb__bar-unhappy { background:var(--refused); }
+.inbox-fb__legend { display:flex; flex-wrap:wrap; gap:2px 6px; margin:8px 0 0 -6px; }
+.inbox-fb__legend button { display:inline-flex; align-items:center; gap:5px; min-height:30px; padding:3px 6px; border:1px solid transparent; border-radius:var(--radius); background:none; color:var(--quiet); font:inherit; font-size:12.5px; cursor:pointer; }
+.inbox-fb__legend button:hover:not(:disabled) { background:var(--hover); color:var(--ink); }
+.inbox-fb__legend button[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-text); }
+.inbox-fb__legend button:disabled { cursor:default; opacity:.7; }
+.inbox-fb__dot { display:inline-block; flex:none; width:8px; height:8px; border-radius:50%; }
+
+/* To follow up: who to call, longest-waiting first. */
+.inbox-fbq { margin:0 0 18px; }
+.inbox-fbq__problem { margin:0 0 18px; }
+.inbox-fbq__head { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:4px 12px; padding:16px 18px 12px; }
+.inbox-fbq__head h2 { display:flex; align-items:center; gap:8px; margin:0; font-size:17px; }
+.inbox-fbq__head h2:focus { outline:none; }
+.inbox-fbq__head h2:focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:4px; }
+.inbox-fbq__order { font-size:12.5px; color:var(--quiet); }
+.inbox-fbq__list { display:grid; gap:10px; margin:0; padding:0 18px 18px; list-style:none; }
+.inbox-fbq__card { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1.6fr) minmax(0,1.3fr) auto; gap:16px; align-items:start; min-width:0; padding:14px; border:1px solid var(--rule); border-radius:var(--radius); }
+.inbox-fbq__card--late { border-left:3px solid var(--refused); }
+.inbox-fbq__who { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.inbox-fbq__name { align-self:flex-start; max-width:100%; font-weight:600; overflow-wrap:anywhere; }
+.inbox-fbq__meta { font-size:12.5px; color:var(--quiet); overflow-wrap:anywhere; }
+.inbox-fbq__who .inbox-fu-clock { margin-top:4px; }
+.inbox-fbq__said { min-width:0; font-size:13px; }
+.inbox-fbq__answer { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.inbox-fbq__words { margin-top:6px; line-height:1.45; overflow-wrap:anywhere; }
+.inbox-fbq__history { min-width:0; font-size:12.5px; }
+.inbox-fbq__acts { display:flex; flex-direction:column; gap:6px; min-width:140px; }
+/* The three follow-up buttons and Open chat are one set of actions. */
+.inbox-fbq__acts .inbox-fu-actions { display:contents; }
+
+/* All answers: the filters, then the sheet. */
+.inbox-fb__head { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:4px 12px; padding:16px 18px 0; }
+.inbox-fb__head h2 { margin:0; font-size:17px; }
+.inbox-fb__count { font-size:12.5px; color:var(--quiet); }
+.inbox-fb__filters { display:flex; flex-direction:column; gap:10px; padding:12px 18px; border-bottom:1px solid var(--rule); }
+.inbox-fb__filters .field { min-width:0; margin-bottom:0; }
 .inbox-fb__filters .field__label { font-size:12px; color:var(--quiet); font-weight:400; }
 .inbox-fb__filters select.input:disabled { color:var(--faint); }
-.inbox-fb__clear { justify-self:start; align-self:center; min-height:32px; margin-bottom:8px; }
+.inbox-fb__answers { min-width:0; }
+.inbox-fb__seg { display:flex; flex-wrap:wrap; gap:6px; }
+.inbox-fb__seg .ops-chip { min-height:34px; padding:6px 11px; }
+.inbox-fb__fields { display:grid; grid-template-columns:repeat(3,minmax(140px,170px)) minmax(200px,1fr); gap:10px 14px; align-items:end; }
+.inbox-fb__morebar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; }
+.inbox-fb__moretoggle { display:inline-flex; align-items:center; gap:4px; min-height:32px; }
+.inbox-fb__caret { font-size:11px; }
+.inbox-fb__oldfilter { min-height:32px; padding:4px 10px; border-color:var(--accent); background:var(--accent-soft); color:var(--accent-text); }
+.inbox-fb__clear { min-height:32px; }
+.inbox-fb__morefields { display:grid; grid-template-columns:repeat(2,minmax(160px,220px)); gap:10px 14px; }
+.inbox-fb__morefields[hidden] { display:none; }
 .inbox-fb .inbox-notice { margin:14px 18px; }
 .inbox-fb .empty { margin:0; }
 .inbox-fb .loading { margin:0; }
@@ -272,17 +328,19 @@
 .inbox-fb__table th:first-child, .inbox-fb__table td:first-child { padding-left:18px; }
 .inbox-fb__table th:last-child, .inbox-fb__table td:last-child { padding-right:18px; }
 .inbox-fb__nowrap { white-space:nowrap; }
-/* An answer, a code and a courier are one word to the eye: they stay on a line and the long cells give way. */
+/* An answer, a code and a chip are one word to the eye: they stay on a line and the long cells give way. */
 .inbox-fb__table .inbox-status { white-space:nowrap; }
 .inbox-fb__line { display:block; margin-top:2px; font-size:12.5px; line-height:1.4; }
-.inbox-fb__line:first-child { margin-top:0; }
-.inbox-fb__line--owed { color:var(--owed); white-space:nowrap; }
 .inbox-fb__note { color:var(--faint); font-size:12px; white-space:normal; }
 .inbox-fb__name { display:block; min-width:110px; overflow-wrap:anywhere; }
 .inbox-fb__products, .inbox-fb__comment { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
-.inbox-fb__products { min-width:110px; }
+.inbox-fb__askedcell { white-space:nowrap; }
+.inbox-fb__askedcell .inbox-fb__note { max-width:130px; }
+.inbox-fb__ordercell { min-width:120px; max-width:200px; }
+.inbox-fb__answercell { min-width:100px; }
 .inbox-fb__commentcell { min-width:150px; max-width:280px; }
-.inbox-fb__followcell { min-width:105px; }
+.inbox-fb__followcell { min-width:140px; max-width:240px; }
+.inbox-fb__fuline { color:var(--quiet); overflow-wrap:anywhere; }
 .inbox-fb__comment--open { display:block; white-space:pre-wrap; }
 .inbox-fb__more { display:block; margin-top:3px; font-size:12px; }
 .inbox-fb__code { display:block; font-size:12.5px; letter-spacing:.02em; white-space:nowrap; }
@@ -292,19 +350,31 @@
 .inbox-fb__who { margin-top:6px; }
 .inbox-fb__who .inbox-fb__name { min-width:0; }
 .inbox-fb__said { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:8px; font-size:13.5px; }
+.inbox-fb__said .inbox-fb__line { margin-top:0; }
 .inbox-fb__block { margin-top:8px; font-size:13px; overflow-wrap:anywhere; }
 .inbox-fb__card .inbox-fb__note { margin-top:8px; }
 
+/* Under 860px the cards and the waiting list stack. */
+@media (max-width:860px) {
+  .ops-tiles.inbox-fb__tiles { grid-template-columns:minmax(0,1fr); gap:10px; }
+  .inbox-fbq__card { grid-template-columns:minmax(0,1fr); gap:10px; }
+  .inbox-fbq__acts { flex-direction:row; flex-wrap:wrap; min-width:0; }
+  .inbox-fbq__acts .inbox-btn { flex:1 1 auto; }
+  .inbox-fb__fields { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .inbox-fb__search { grid-column:1 / -1; }
+}
+
 @media (max-width:800px) {
-  .inbox-fb__tiles { grid-template-columns:1fr 1fr; }
-  .inbox-fb__tiles > :last-child:nth-child(odd) { grid-column:1 / -1; }
-  .inbox-fb__filters { grid-template-columns:1fr 1fr; padding:12px 14px 4px; }
-  /* Two to a row until the words need the line; a finger needs 44px, and 16px stops the phone zooming in. */
+  .inbox-fb__head, .inbox-fbq__head { padding-left:14px; padding-right:14px; }
+  .inbox-fbq__list { padding:0 14px 14px; }
+  .inbox-fb__filters { padding:12px 14px; }
+  .inbox-fb__morefields { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  /* A finger needs 44px, and 16px stops the phone zooming in. */
   .inbox-fb__filters .input { min-height:44px; font-size:16px; }
-  .inbox-fb__filters .field:nth-last-of-type(-n+2) { grid-column:1 / -1; }
+  .inbox-fb__seg .ops-chip, .inbox-fb__legend button, .inbox-fb__moretoggle, .inbox-fb__oldfilter { min-height:44px; }
   .inbox-fb__clear, .inbox-fb__download, .inbox-fb__headacts .inbox-btn { min-height:44px; }
   .inbox-fb-block .inbox-btn { min-height:44px; }
-  /* A finger needs 44px, and 16px stops the phone zooming into the note. */
+  .inbox-fbq__acts .inbox-btn { min-height:44px; }
   .inbox-fu-actions .inbox-btn, .inbox-fu-dialog__acts .inbox-btn, .inbox-fu-history__more { min-height:44px; }
   .inbox-fu-textarea { font-size:16px; }
   .inbox-fu-check { min-height:44px; }

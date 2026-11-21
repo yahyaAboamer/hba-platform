@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { ApiError, api } from "../../lib/api";
-import { RATING_WORDS, REORDER_WORDS, feedbackStateNote, formatPhone } from "../../lib/inbox";
+import { RATING_WORDS } from "../../lib/inbox";
 import type {
   FeedbackFollowUp,
   FeedbackOptions,
@@ -10,30 +10,39 @@ import type {
   FeedbackRating,
   FeedbackRow,
   FeedbackSummary,
+  FollowUpListPage,
 } from "../../lib/inbox";
-import { OpsIcon, dayAndTime, dayMonth, useIsNarrow } from "../../components/OpsSource";
+import { OpsIcon, useIsNarrow, useNow } from "../../components/OpsSource";
+import { FollowUpList } from "./FeedbackFollowUpList";
+import { SheetCards, SheetTable } from "./FeedbackSheet";
 import { InboxIcon } from "./InboxIcon";
 import "../operations/OperationsDashboard.css";
 import "./Inbox.css";
 
 /**
- * Inbox → Feedback: every answer to "how did your order go?", one row per
- * asked order, like the sheet Google Forms gives (ADR 0083, decision 6).
+ * Inbox → Feedback: every answer to "how did your order go?" (ADR 0083,
+ * decision 6), rebuilt around the follow-up (ADR 0087). Top to bottom: four
+ * summary cards, *To follow up* (everyone still waiting on a person, whatever
+ * the filters say), and *All answers*, the sheet.
  *
- * Nothing in the sheet is written here: a chat is where a person follows an
- * unhappy answer up and presses *Resolved*. The sheet reads, filters and
- * downloads.
- *
- * Every filter lives in the address, so a filtered view can be linked and
- * survives a reload. No approved export draws this screen; it is built from
- * the Inbox's and Operations' own pieces (the Confirmations cards, the
- * Operations table and phone rows, the Chats chips).
+ * The follow-up is recorded here and beside the chat (`FollowUp.tsx`); the
+ * sheet itself only reads, filters and downloads. Every filter lives in the
+ * address, so a filtered view can be linked and survives a reload. The
+ * approved mockup is `feedback-layout.html` part 1; it is drawn with the
+ * Inbox's and Operations' own pieces.
  */
 
 const RATINGS: FeedbackRating[] = ["loved", "okay", "unhappy"];
-const FOLLOW_UPS: FeedbackFollowUp[] = ["needs_follow_up", "resolved", "reopened"];
+type AnswerFilter = FeedbackRating | "none" | "";
+/** The Answer control, left to right. `none` is "No answer yet". */
+const ANSWERS: { id: AnswerFilter; title: string }[] = [
+  { id: "", title: "All" },
+  ...RATINGS.map((id) => ({ id, title: RATING_WORDS[id] })),
+  { id: "none", title: "No answer yet" },
+];
+const FOLLOW_UPS: FeedbackFollowUp[] = ["needs_follow_up", "resolved", "reopened", "unreached"];
 const FOLLOW_UP_WORDS: Record<FeedbackFollowUp, string> = {
-  needs_follow_up: "Needs follow-up",
+  needs_follow_up: "To follow up",
   resolved: "Resolved",
   reopened: "Reopened",
   unreached: "Couldn't reach",
@@ -41,17 +50,18 @@ const FOLLOW_UP_WORDS: Record<FeedbackFollowUp, string> = {
 
 /** The sheet opens on the last 30 days: today and the 29 before it. */
 const DEFAULT_DAYS = 30;
-/** A comment longer than this can be opened out; every one carries its full text as a tooltip. */
-const LONG_COMMENT = 60;
 const SEARCH_AFTER_MS = 300;
+/** What the promise is until the list says otherwise (Feedback setup's default). */
+const DEFAULT_REPLY_HOURS = 24;
 
 type Filters = {
   since: string;
   until: string;
-  rating: FeedbackRating | "";
+  rating: AnswerFilter;
   reason: string;
   courier: string;
   state: FeedbackFollowUp | "";
+  /** No box of its own any more (search covers products); kept so old links still filter. */
   product: string;
   q: string;
 };
@@ -67,13 +77,14 @@ function cairoDay(daysAgo: number): string {
 }
 
 const isDay = (value: string | null): value is string => /^\d{4}-\d{2}-\d{2}$/.test(value ?? "");
+const isRating = (value: string): value is FeedbackRating => RATINGS.includes(value as FeedbackRating);
 
 // ── Filters in the address ──────────────────────────────────────────────────
 
 function readFilters(params: URLSearchParams, defaultSince: string): Filters {
-  const rating = params.get("rating");
+  const rating = params.get("rating") ?? "";
   const state = params.get("state");
-  const chosen = RATINGS.includes(rating as FeedbackRating) ? (rating as FeedbackRating) : "";
+  const chosen: AnswerFilter = isRating(rating) || rating === "none" ? rating : "";
   const since = params.get("since");
   const until = params.get("until");
   return {
@@ -82,7 +93,7 @@ function readFilters(params: URLSearchParams, defaultSince: string): Filters {
     until: isDay(until) ? until : "",
     rating: chosen,
     // A reason belongs to an answer: without one it is not asked for.
-    reason: chosen ? (params.get("reason") ?? "") : "",
+    reason: isRating(chosen) ? (params.get("reason") ?? "") : "",
     courier: params.get("courier") ?? "",
     state: FOLLOW_UPS.includes(state as FeedbackFollowUp) ? (state as FeedbackFollowUp) : "",
     product: params.get("product") ?? "",
@@ -133,322 +144,118 @@ function useTyped(value: string, commit: (value: string) => void): [string, (val
   return [typed, setTyped];
 }
 
-// ── What a row says ─────────────────────────────────────────────────────────
+// ── The four cards ──────────────────────────────────────────────────────────
 
-function titleCase(id: string): string {
-  const words = id.replace(/_/g, " ");
-  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
-}
+const count = (n: number) => n.toLocaleString("en-US");
 
-function reasonTitle(row: FeedbackRow, options: FeedbackOptions | null): string | null {
-  if (!row.reason) return null;
-  const menu = row.rating ? options?.reasons[row.rating] : undefined;
-  return menu?.find((choice) => choice.id === row.reason)?.title ?? titleCase(row.reason);
-}
+function Cards({
+  summary,
+  rating,
+  old,
+  hours,
+  canGoToList,
+  onRating,
+  onGoToList,
+}: {
+  summary: FeedbackSummary;
+  rating: AnswerFilter;
+  /** The numbers are from the last question, while the next is on its way. */
+  old: boolean;
+  hours: number;
+  /** Whether anyone is in the *To follow up* list to go to. */
+  canGoToList: boolean;
+  onRating: (rating: FeedbackRating, on: boolean) => void;
+  onGoToList: () => void;
+}) {
+  const answeredFoot = [
+    summary.asked > 0 ? `${Math.round((summary.answered / summary.asked) * 100)}% answered` : null,
+    summary.not_reached > 0 ? `${count(summary.not_reached)} couldn't be reached` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const felt = summary.loved + summary.okay + summary.unhappy;
+  const overdue = summary.overdue ?? 0;
+  const solvedAsked = summary.solved_asked ?? 0;
 
-type Line = { text: string; tone?: "owed" };
-
-/** Where the follow-up stands, a line each. */
-function followUpLines(row: FeedbackRow): Line[] {
-  const lines: Line[] = [];
-  if (row.needs_follow_up) {
-    lines.push({ text: "Needs follow-up", tone: "owed" });
-  } else if (row.resolved_at) {
-    lines.push({
-      text: row.resolved_by_name
-        ? `Resolved by ${row.resolved_by_name} on ${dayMonth(row.resolved_at)}`
-        : `Resolved on ${dayMonth(row.resolved_at)}`,
-    });
-  }
-  if (row.reopened_count > 0) lines.push({ text: `Reopened ${row.reopened_count}×` });
-  if (row.solved !== null) lines.push({ text: `Solved: ${row.solved ? "yes" : "no"}` });
-  if (row.reorder) lines.push({ text: `Order again: ${REORDER_WORDS[row.reorder]}` });
-  return lines;
-}
-
-/** A quiet note on a question that did not go as it should have. */
-function problemNote(row: FeedbackRow): string | null {
-  // "Not on WhatsApp" already says it; the stored reason only repeats it.
-  const why = row.state === "no_whatsapp" ? null : row.last_error;
-  const words = [feedbackStateNote(row.state), why].filter(Boolean);
-  return words.length ? words.join(": ") : null;
-}
-
-function askedAt(row: FeedbackRow): string {
-  const at = row.asked_at ?? row.sent_at;
-  return at ? dayAndTime(at) : "—";
-}
-
-function Answer({ row }: { row: FeedbackRow }) {
-  if (!row.rating) return <span className="ops-muted">No answer yet</span>;
-  const tone = row.rating === "loved" ? "settled" : row.rating === "unhappy" ? "refused" : "plain";
-  return <span className={`inbox-status inbox-status--${tone}`}>{RATING_WORDS[row.rating]}</span>;
-}
-
-function Lines({ lines }: { lines: Line[] }) {
-  if (lines.length === 0) return <span className="ops-muted">—</span>;
-  return (
+  const followUpBody = (
     <>
-      {lines.map((line) => (
-        <span key={line.text} className={line.tone ? "inbox-fb__line inbox-fb__line--owed" : "inbox-fb__line"}>
-          {line.text}
+      <span className="ops-tile__label">To follow up</span>
+      <span className="ops-tile__value">{count(summary.needs_follow_up)}</span>
+      {overdue > 0 && (
+        <span className="ops-tile__note inbox-fb__late">
+          {count(overdue)} past the {hours}-hour promise
         </span>
-      ))}
-    </>
-  );
-}
-
-function Code({ row }: { row: FeedbackRow }) {
-  if (!row.code) return <span className="ops-muted">—</span>;
-  return (
-    <>
-      <span className="num inbox-fb__code">{row.code}</span>
-      <span className="inbox-fb__line ops-muted">
-        {row.code_used_at ? (row.code_order_name ? `Used on ${row.code_order_name}` : "Used") : "Not used"}
-      </span>
-    </>
-  );
-}
-
-/**
- * What she wrote: two lines, the whole of it on a tap and as a tooltip. It is
- * her own words, in any script, so each line reads in its own direction.
- * `order` says whose comment the button opens, for a screen reader that hears
- * every one of them in turn.
- */
-function Comment({ text, order }: { text: string | null; order?: string | null }) {
-  const [open, setOpen] = useState(false);
-  if (!text) return <span className="ops-muted">—</span>;
-  const whose = order ? ` of the comment on ${order}` : " of the comment";
-  return (
-    <>
-      <span
-        className={open ? "inbox-fb__comment inbox-fb__comment--open" : "inbox-fb__comment"}
-        dir="auto"
-        title={text}
-      >
-        {text}
-      </span>
-      {text.length > LONG_COMMENT && (
-        <button
-          type="button"
-          className="ops-linkbtn inbox-fb__more"
-          aria-expanded={open}
-          aria-label={`${open ? "Show less" : "Show all"}${whose}`}
-          onClick={() => setOpen(!open)}
-        >
-          {open ? "Show less" : "Show all"}
-        </button>
       )}
     </>
   );
-}
+  const owed = summary.needs_follow_up > 0 ? " inbox-fb__tile--owed" : "";
 
-function Note({ row }: { row: FeedbackRow }) {
-  const note = problemNote(row);
-  return note ? <span className="inbox-fb__line inbox-fb__note">{note}</span> : null;
-}
-
-function Customer({ row }: { row: FeedbackRow }) {
-  return (
-    <>
-      <span className="inbox-fb__name" dir="auto">
-        {row.customer_name?.trim() || <span className="ops-muted">No name</span>}
-      </span>
-      <span className="inbox-fb__line ops-muted num">{formatPhone(row.phone) || "—"}</span>
-    </>
-  );
-}
-
-const productsOf = (row: FeedbackRow) => row.products.join(", ");
-
-function Products({ row }: { row: FeedbackRow }) {
-  const products = productsOf(row);
-  if (!products) return <span className="ops-muted">—</span>;
-  return (
-    <span className="inbox-fb__products" dir="auto" title={products}>
-      {products}
-    </span>
-  );
-}
-
-function SheetTable({ rows, options }: { rows: FeedbackRow[]; options: FeedbackOptions | null }) {
-  return (
-    <div className="inbox-fb__scroll">
-      <table className="ops-table inbox-fb__table">
-        <caption className="visually-hidden">Answers to the delivery question, newest first</caption>
-        <thead>
-          <tr>
-            <th scope="col">Asked</th>
-            <th scope="col">Customer</th>
-            <th scope="col">Order</th>
-            <th scope="col">Products</th>
-            <th scope="col">Courier</th>
-            <th scope="col">Answer</th>
-            <th scope="col">Reason</th>
-            <th scope="col">Comment</th>
-            <th scope="col">Follow-up</th>
-            <th scope="col">Code</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              <td className="num inbox-fb__nowrap">
-                {askedAt(row)}
-                <Note row={row} />
-              </td>
-              <td>
-                <Customer row={row} />
-              </td>
-              <td className="num inbox-fb__nowrap">{row.order_name ?? row.order_id}</td>
-              <td>
-                <Products row={row} />
-              </td>
-              <td className="inbox-fb__nowrap">{row.courier ?? <span className="ops-muted">—</span>}</td>
-              <td className="inbox-fb__nowrap">
-                <Answer row={row} />
-              </td>
-              <td className="inbox-fb__nowrap">{reasonTitle(row, options) ?? <span className="ops-muted">—</span>}</td>
-              <td className="inbox-fb__commentcell">
-                <Comment text={row.comment} order={row.order_name} />
-              </td>
-              <td className="inbox-fb__followcell">
-                <Lines lines={followUpLines(row)} />
-              </td>
-              <td className="inbox-fb__nowrap">
-                <Code row={row} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** On a phone each answer is a card, never a row to scroll sideways. */
-function SheetCards({ rows, options }: { rows: FeedbackRow[]; options: FeedbackOptions | null }) {
-  return (
-    <ul className="ops-rows">
-      {rows.map((row) => {
-        const reason = reasonTitle(row, options);
-        const lines = followUpLines(row);
-        return (
-          <li key={row.id} className="inbox-fb__card">
-            <div className="ops-rows__top">
-              <span className="num">{row.order_name ?? row.order_id}</span>
-              <span className="ops-muted num">{askedAt(row)}</span>
-            </div>
-            <div className="inbox-fb__who">
-              <Customer row={row} />
-            </div>
-            <div className="inbox-fb__said">
-              <Answer row={row} />
-              {reason && <span>{reason}</span>}
-            </div>
-            {row.comment && (
-              <div className="inbox-fb__block">
-                <Comment text={row.comment} order={row.order_name} />
-              </div>
-            )}
-            {(row.products.length > 0 || row.courier) && (
-              <div className="inbox-fb__block ops-muted">
-                {[productsOf(row), row.courier].filter(Boolean).join(" · ")}
-              </div>
-            )}
-            {lines.length > 0 && (
-              <div className="inbox-fb__block">
-                <Lines lines={lines} />
-              </div>
-            )}
-            {row.code && (
-              <div className="inbox-fb__block">
-                <Code row={row} />
-              </div>
-            )}
-            <Note row={row} />
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-// ── The summary row ─────────────────────────────────────────────────────────
-
-type TileFilter = { rating: FeedbackRating } | { state: FeedbackFollowUp } | null;
-
-const TILES: { key: keyof FeedbackSummary; label: string; filter: TileFilter }[] = [
-  { key: "asked", label: "Asked", filter: null },
-  { key: "answered", label: "Answered", filter: null },
-  { key: "loved", label: "Loved it", filter: { rating: "loved" } },
-  { key: "okay", label: "It was okay", filter: { rating: "okay" } },
-  { key: "unhappy", label: "Not happy", filter: { rating: "unhappy" } },
-  { key: "needs_follow_up", label: "Needs follow-up", filter: { state: "needs_follow_up" } },
-  { key: "solved", label: "Solved", filter: null },
-  { key: "codes_sent", label: "Codes sent", filter: null },
-  { key: "codes_used", label: "Codes used", filter: null },
-];
-
-function Tiles({
-  summary,
-  filters,
-  old,
-  onFilter,
-}: {
-  summary: FeedbackSummary;
-  filters: Filters;
-  /** The numbers are from the last question, while the next is on its way. */
-  old: boolean;
-  onFilter: (tile: NonNullable<TileFilter>, on: boolean) => void;
-}) {
   return (
     <div
       className={old ? "ops-tiles inbox-fb__tiles ops-tiles--old" : "ops-tiles inbox-fb__tiles"}
       role="group"
       aria-label="Summary of these answers"
     >
-      {TILES.map(({ key, label, filter }) => {
-        const count = summary[key];
-        const body = (
-          <>
-            <span className="ops-tile__label">{label}</span>
-            <span className="ops-tile__value">{count.toLocaleString("en-US")}</span>
-            {key === "asked" && (summary.not_reached ?? 0) > 0 && (
-              <span className="ops-tile__note ops-muted">
-                {summary.not_reached.toLocaleString("en-US")} could not be reached
-              </span>
-            )}
-          </>
-        );
-        const pressed =
-          filter !== null &&
-          ("rating" in filter ? filters.rating === filter.rating : filters.state === filter.state);
-        // A card with nothing behind it cannot be opened, unless it is the
-        // one that is already narrowing the sheet: that one switches off.
-        if (filter === null || (count === 0 && !pressed)) {
-          return (
-            <div
-              key={key}
-              className={count === 0 ? "ops-tile ops-tile--zero inbox-fb__tile inbox-fb__tile--static" : "ops-tile inbox-fb__tile inbox-fb__tile--static"}
-            >
-              {body}
-            </div>
-          );
-        }
-        return (
-          <button
-            key={key}
-            type="button"
-            className="ops-tile inbox-fb__tile"
-            aria-pressed={pressed}
-            onClick={() => onFilter(filter, !pressed)}
-          >
-            {body}
-          </button>
-        );
-      })}
+      <div className="ops-tile inbox-fb__tile">
+        <span className="ops-tile__label">Answered</span>
+        <span className="ops-tile__value">
+          {count(summary.answered)}
+          <span className="inbox-fb__of"> of {count(summary.asked)} asked</span>
+        </span>
+        {answeredFoot && <span className="ops-tile__note">{answeredFoot}</span>}
+      </div>
+
+      <div className="ops-tile inbox-fb__tile inbox-fb__tile--felt">
+        <span className="ops-tile__label">How they felt</span>
+        <div className="inbox-fb__bar" aria-hidden="true">
+          {felt > 0 &&
+            RATINGS.map((id) => (
+              <span
+                key={id}
+                className={`inbox-fb__bar-${id}`}
+                style={{ width: `${(summary[id] / felt) * 100}%` }}
+              />
+            ))}
+        </div>
+        <div className="inbox-fb__legend">
+          {RATINGS.map((id) => {
+            const pressed = rating === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={pressed}
+                disabled={summary[id] === 0 && !pressed}
+                onClick={() => onRating(id, !pressed)}
+              >
+                <i className={`inbox-fb__dot inbox-fb__bar-${id}`} aria-hidden="true" />
+                {RATING_WORDS[id]} <span className="num">{count(summary[id])}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {canGoToList ? (
+        <button type="button" className={`ops-tile inbox-fb__tile${owed}`} onClick={onGoToList}>
+          {followUpBody}
+        </button>
+      ) : (
+        <div className={`ops-tile inbox-fb__tile inbox-fb__tile--static${owed}`}>{followUpBody}</div>
+      )}
+
+      <div className="ops-tile inbox-fb__tile">
+        <span className="ops-tile__label">Reward codes used</span>
+        <span className="ops-tile__value">
+          {count(summary.codes_used)}
+          <span className="inbox-fb__of"> of {count(summary.codes_sent)} sent</span>
+        </span>
+        {solvedAsked > 0 && (
+          <span className="ops-tile__note">
+            Problems solved: {count(summary.solved)} of {count(solvedAsked)} asked
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -470,6 +277,8 @@ function save(blob: Blob, name: string) {
 export function InboxFeedback() {
   const [params, setParams] = useSearchParams();
   const narrow = useIsNarrow();
+  const now = useNow();
+  const ids = useId();
   const [defaultSince] = useState(() => cairoDay(DEFAULT_DAYS - 1));
   const filters = readFilters(params, defaultSince);
   const query = queryFor(filters);
@@ -498,6 +307,7 @@ export function InboxFeedback() {
     [defaultSince, setParams],
   );
 
+  // ── The sheet, its numbers and its menus ──
   const [rows, setRows] = useState<FeedbackRow[] | null>(null);
   const [next, setNext] = useState<number | null>(null);
   const [summary, setSummary] = useState<FeedbackSummary | null>(null);
@@ -565,13 +375,59 @@ export function InboxFeedback() {
       });
   }
 
-  const [productTyped, setProductTyped] = useTyped(filters.product, (value) => change({ product: value }));
+  // ── To follow up: its own read, deaf to the filters ──
+  const [waiting, setWaiting] = useState<FollowUpListPage | null>(null);
+  const [waitingFailed, setWaitingFailed] = useState(false);
+  const [waitingAttempt, setWaitingAttempt] = useState(0);
+  const waitingAsked = useRef(0);
+  const listHeading = useRef<HTMLHeadingElement>(null);
+  // After an action the card may be gone; focus must not be left on nothing.
+  const refocus = useRef(false);
+
+  useEffect(() => {
+    const question = ++waitingAsked.current;
+    setWaitingFailed(false);
+    api
+      .get<FollowUpListPage>("/api/inbox/feedback/follow-up")
+      .then((page) => {
+        if (question !== waitingAsked.current) return;
+        setWaiting(page);
+      })
+      .catch(() => {
+        if (question !== waitingAsked.current) return;
+        setWaitingFailed(true);
+      });
+  }, [waitingAttempt]);
+
+  useEffect(() => {
+    if (!refocus.current || waiting === null) return;
+    refocus.current = false;
+    const lost = !document.activeElement || document.activeElement === document.body;
+    if (lost) listHeading.current?.focus();
+  }, [waiting]);
+
+  function recorded() {
+    // The server's answer wins: the list, the cards and the sheet are read again.
+    refocus.current = true;
+    setWaitingAttempt((n) => n + 1);
+    setAttempt((n) => n + 1);
+  }
+
+  function goToList() {
+    const heading = listHeading.current;
+    if (!heading) return;
+    heading.scrollIntoView?.({ block: "start" });
+    heading.focus({ preventScroll: true });
+  }
+
   const [searchTyped, setSearchTyped] = useTyped(filters.q, (value) => change({ q: value }));
 
-  function filterByTile(tile: NonNullable<TileFilter>, on: boolean) {
-    if ("rating" in tile) change({ rating: on ? tile.rating : "", reason: "" });
-    else change({ state: on ? tile.state : "" });
-  }
+  // ── More filters: courier and reason, open by itself when one is set ──
+  const moreSet = (filters.courier ? 1 : 0) + (filters.reason ? 1 : 0);
+  const [moreOpen, setMoreOpen] = useState(moreSet > 0);
+  useEffect(() => {
+    if (filters.courier || filters.reason) setMoreOpen(true);
+  }, [filters.courier, filters.reason]);
 
   const [downloading, setDownloading] = useState(false);
   const [downloadProblem, setDownloadProblem] = useState<string | null>(null);
@@ -590,11 +446,13 @@ export function InboxFeedback() {
     }
   }
 
-  const reasons = filters.rating ? (options?.reasons[filters.rating] ?? []) : [];
+  const reasons = isRating(filters.rating) ? (options?.reasons[filters.rating] ?? []) : [];
   const couriers = options?.couriers ?? [];
   const courierMenu = filters.courier && !couriers.includes(filters.courier) ? [...couriers, filters.courier] : couriers;
-  const ratingMenu = options?.ratings ?? RATINGS.map((id) => ({ id, title: RATING_WORDS[id] }));
   const stateMenu = options?.states ?? FOLLOW_UPS.map((id) => ({ id, title: FOLLOW_UP_WORDS[id] }));
+  const hours = waiting?.reply_hours ?? DEFAULT_REPLY_HOURS;
+  const answerLabel = `${ids}-answer`;
+  const moreId = `${ids}-more`;
 
   return (
     <>
@@ -636,126 +494,183 @@ export function InboxFeedback() {
       )}
 
       {summary && (
-        <Tiles summary={summary} filters={filters} old={rows === null} onFilter={filterByTile} />
+        <Cards
+          summary={summary}
+          rating={filters.rating}
+          old={rows === null}
+          hours={hours}
+          canGoToList={(waiting?.rows.length ?? 0) > 0}
+          onRating={(rating, on) => change({ rating: on ? rating : "", reason: "" })}
+          onGoToList={goToList}
+        />
       )}
 
-      <section className="panel inbox-fb" aria-label="Answers">
+      {waitingFailed && (
+        <p className="notice notice--refused inbox-fbq__problem" role="alert">
+          Couldn't load who is waiting for a follow-up.{" "}
+          <button type="button" className="ops-linkbtn" onClick={() => setWaitingAttempt((n) => n + 1)}>
+            Try again
+          </button>
+        </p>
+      )}
+
+      {waiting && (
+        <FollowUpList
+          rows={waiting.rows}
+          hours={hours}
+          options={options}
+          now={now}
+          headingRef={listHeading}
+          onChanged={recorded}
+        />
+      )}
+
+      <section className="panel inbox-fb" aria-labelledby={`${ids}-all`}>
+        <div className="inbox-fb__head">
+          <h2 id={`${ids}-all`}>All answers</h2>
+          {summary && <span className="inbox-fb__count num">{count(summary.asked)} asked</span>}
+        </div>
         <form className="inbox-fb__filters" role="search" aria-label="Filter the answers" onSubmit={(event) => event.preventDefault()}>
-          <label className="field">
-            <span className="field__label">From</span>
-            <input
-              className="input"
-              type="date"
-              value={filters.since}
-              max={filters.until || undefined}
-              onChange={(event) => change({ since: event.target.value })}
-            />
-          </label>
-          <label className="field">
-            <span className="field__label">To</span>
-            <input
-              className="input"
-              type="date"
-              value={filters.until}
-              min={filters.since || undefined}
-              onChange={(event) => change({ until: event.target.value })}
-            />
-          </label>
-          <label className="field">
-            <span className="field__label">Answer</span>
-            <select
-              className="input"
-              value={filters.rating}
-              onChange={(event) => change({ rating: event.target.value, reason: "" })}
-            >
-              <option value="">Any answer</option>
-              {ratingMenu.map((choice) => (
-                <option key={choice.id} value={choice.id}>
+          <div className="inbox-fb__answers" role="group" aria-labelledby={answerLabel}>
+            <span id={answerLabel} className="field__label">
+              Answer
+            </span>
+            <div className="inbox-fb__seg">
+              {ANSWERS.map((choice) => (
+                <button
+                  key={choice.id || "all"}
+                  type="button"
+                  className="ops-chip"
+                  aria-pressed={filters.rating === choice.id}
+                  onClick={() => change({ rating: choice.id, reason: "" })}
+                >
                   {choice.title}
-                </option>
+                </button>
               ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="field__label">Reason</span>
-            <select
-              className="input"
-              value={filters.reason}
-              disabled={!filters.rating}
-              title={filters.rating ? undefined : "Choose an answer first"}
-              onChange={(event) => change({ reason: event.target.value })}
-            >
-              <option value="">Any reason</option>
-              {reasons.map((choice) => (
-                <option key={choice.id} value={choice.id}>
-                  {choice.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="field__label">Courier</span>
-            <select
-              className="input"
-              value={filters.courier}
-              onChange={(event) => change({ courier: event.target.value })}
-            >
-              <option value="">Any courier</option>
-              {courierMenu.map((courier) => (
-                <option key={courier} value={courier}>
-                  {courier}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="field__label">Follow-up</span>
-            <select
-              className="input"
-              value={filters.state}
-              onChange={(event) => change({ state: event.target.value })}
-            >
-              <option value="">Any</option>
-              {stateMenu.map((choice) => (
-                <option key={choice.id} value={choice.id}>
-                  {choice.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="field__label">Product</span>
-            <input
-              className="input"
-              type="search"
-              value={productTyped}
-              maxLength={120}
-              autoComplete="off"
-              placeholder="Part of a product name"
-              onChange={(event) => setProductTyped(event.target.value)}
-            />
-          </label>
-          <label className="field">
-            <span className="field__label">Search</span>
-            <input
-              className="input"
-              type="search"
-              value={searchTyped}
-              maxLength={120}
-              autoComplete="off"
-              placeholder="Order, name or phone"
-              onChange={(event) => setSearchTyped(event.target.value)}
-            />
-          </label>
-          {!untouched && (
+            </div>
+          </div>
+          <div className="inbox-fb__fields">
+            <label className="field">
+              <span className="field__label">From</span>
+              <input
+                className="input"
+                type="date"
+                value={filters.since}
+                max={filters.until || undefined}
+                onChange={(event) => change({ since: event.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span className="field__label">To</span>
+              <input
+                className="input"
+                type="date"
+                value={filters.until}
+                min={filters.since || undefined}
+                onChange={(event) => change({ until: event.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span className="field__label">Follow-up</span>
+              <select
+                className="input"
+                value={filters.state}
+                onChange={(event) => change({ state: event.target.value })}
+              >
+                <option value="">Any</option>
+                {stateMenu.map((choice) => (
+                  <option key={choice.id} value={choice.id}>
+                    {choice.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field inbox-fb__search">
+              <span className="field__label">Search</span>
+              <input
+                className="input"
+                type="search"
+                value={searchTyped}
+                maxLength={120}
+                autoComplete="off"
+                placeholder="Order, name, phone or product"
+                onChange={(event) => setSearchTyped(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="inbox-fb__morebar">
             <button
               type="button"
-              className="ops-linkbtn inbox-fb__clear"
-              onClick={() => setParams({}, { replace: true })}
+              className="ops-linkbtn inbox-fb__moretoggle"
+              aria-expanded={moreOpen}
+              aria-controls={moreId}
+              onClick={() => setMoreOpen(!moreOpen)}
             >
-              Clear filters
+              More filters{moreSet > 0 ? ` (${moreSet})` : ""}
+              <span className="inbox-fb__caret" aria-hidden="true">
+                {moreOpen ? "▴" : "▾"}
+              </span>
             </button>
-          )}
+            {filters.product && (
+              <button
+                type="button"
+                className="ops-chip inbox-fb__oldfilter"
+                title="Remove this filter"
+                onClick={() => change({ product: "" })}
+              >
+                <span dir="auto">Product: {filters.product}</span>
+                <span className="visually-hidden">, remove this filter</span>
+                <span aria-hidden="true">×</span>
+              </button>
+            )}
+            {!untouched && (
+              <button
+                type="button"
+                className="ops-linkbtn inbox-fb__clear"
+                onClick={() => setParams({}, { replace: true })}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+          <div id={moreId} className="inbox-fb__morefields" hidden={!moreOpen}>
+            {moreOpen && (
+              <>
+                <label className="field">
+                  <span className="field__label">Courier</span>
+                  <select
+                    className="input"
+                    value={filters.courier}
+                    onChange={(event) => change({ courier: event.target.value })}
+                  >
+                    <option value="">Any courier</option>
+                    {courierMenu.map((courier) => (
+                      <option key={courier} value={courier}>
+                        {courier}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span className="field__label">Reason</span>
+                  <select
+                    className="input"
+                    value={filters.reason}
+                    disabled={!isRating(filters.rating)}
+                    title={isRating(filters.rating) ? undefined : "Choose an answer first"}
+                    onChange={(event) => change({ reason: event.target.value })}
+                  >
+                    <option value="">Any reason</option>
+                    {reasons.map((choice) => (
+                      <option key={choice.id} value={choice.id}>
+                        {choice.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
+          </div>
         </form>
 
         {failed && (
