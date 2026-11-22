@@ -17,8 +17,10 @@ a 401, so a refused key and an outage look the same from here.
 
 import json
 import logging
+import re
 import time
 from datetime import datetime
+from urllib.parse import quote
 
 import httpx
 from sqlalchemy import delete, select
@@ -48,8 +50,14 @@ MAX_ATTEMPTS = 3
 DIDNT_ANSWER = "E-stebdal didn't answer."
 
 
+class Rejected(Exception):
+    """E-stebdal answered a write with a refusal (4xx other than the key).
+    Its text is E-stebdal's own message, fit to show."""
+
+
 class EstebdalClient:
-    """Reads E-stebdal's returns list. Never writes."""
+    """Reads E-stebdal's returns list, and marks one request received
+    (ADR 0090) - its only write."""
 
     def __init__(
         self,
@@ -92,6 +100,86 @@ class EstebdalClient:
                     raise SourceUnavailable(DIDNT_ANSWER) from None
         raise SourceUnavailable(DIDNT_ANSWER)
 
+    def _post(self, path: str, body: dict) -> dict:
+        """One attempt, never repeated: a lost answer is found on the next
+        read, as the request already *Processing* (ADR 0090)."""
+        with httpx.Client(transport=self._transport, timeout=self._timeout) as http:
+            try:
+                response = http.post(
+                    f"{BASE_URL}{path}", json=body, headers={"x-api-key": self._api_key}
+                )
+            except httpx.HTTPError:
+                raise SourceUnavailable(DIDNT_ANSWER) from None
+        if response.status_code in (401, 403):
+            raise KeyRefused("E-stebdal refused the key.")
+        if response.status_code == 429 or response.status_code >= 500:
+            raise SourceUnavailable(DIDNT_ANSWER)
+        try:
+            answer = response.json()
+        except ValueError:
+            answer = None
+        if response.status_code >= 400:
+            message = None
+            if isinstance(answer, dict) and isinstance(answer.get("error"), dict):
+                message = answer["error"].get("message")
+            raise Rejected(str(message or "E-stebdal refused it.")[:150])
+        if not isinstance(answer, dict):
+            raise SourceUnavailable("E-stebdal answered in a way Operations doesn't recognise.")
+        return answer
+
+    def requests_for_order(self, order_number: str) -> list[dict]:
+        """Every request on this Shopify order, whatever its status: ``id``,
+        ``number``, ``order_number`` and ``status``, nothing about the
+        customer.
+
+        E-stebdal filters by request number, which is the order number with
+        ``-R1``, ``-R2``...; ``contains`` also finds ``#132546-R1`` for
+        ``#32546``, so only an exact order number is kept.
+        """
+        digits = _digits(order_number)
+        if not digits:
+            return []
+        query = json.dumps([{"field": "returnNumber", "operator": "contains", "value": f"{digits}-R"}])
+        found: dict[str, dict] = {}
+        for page in range(1, MAX_PAGES + 1):
+            body = self._get("/returns", {"filter": query, "limit": PAGE_SIZE, "page": page})
+            try:
+                for item in body["data"]:
+                    if _digits(item.get("orderNumber")) != digits:
+                        continue
+                    found[str(item["id"])] = {
+                        "id": str(item["id"]),
+                        "number": str(item["returnNumber"]),
+                        "order_number": item.get("orderNumber"),
+                        "status": str(item["status"]),
+                    }
+                more = bool(body["meta"]["hasNextPage"])
+            except (KeyError, TypeError, ValueError):
+                raise SourceUnavailable(
+                    "E-stebdal answered in a way Operations doesn't recognise."
+                ) from None
+            if not more:
+                return list(found.values())
+        raise SourceUnavailable("E-stebdal returned more requests than Operations reads.")
+
+    def mark_received(self, request_id: str, notify: bool) -> dict:
+        """Mark one *Approved* request received: it becomes *Processing*,
+        and E-stebdal emails the customer when ``notify``."""
+        answer = self._post(
+            f"/returns/{quote(str(request_id), safe='')}/received", {"notifyCustomer": bool(notify)}
+        )
+        data = answer.get("data") if isinstance(answer.get("data"), dict) else {}
+        warnings = [
+            str(w.get("message"))[:150]
+            for w in answer.get("warnings") or []
+            if isinstance(w, dict) and w.get("message")
+        ]
+        return {
+            "status": data.get("status"),
+            "cash_refund_recorded": bool(data.get("cashRefundRecorded")),
+            "warnings": warnings,
+        }
+
     def check(self) -> None:
         """One small read, to prove a key before it is saved."""
         body = self._get("/returns", {"limit": 1})
@@ -129,6 +217,12 @@ class EstebdalClient:
             if not more:
                 return list(kept.values())
         raise SourceUnavailable("E-stebdal returned more requests than Operations reads.")
+
+
+def _digits(order_number) -> str | None:
+    """``#32546`` and ``32546`` alike, as ``32546``."""
+    found = re.fullmatch(r"\s*#?\s*(\d{1,12})\s*", str(order_number or ""))
+    return found.group(1) if found else None
 
 
 def _parse_time(value: str) -> datetime:

@@ -284,6 +284,19 @@ class OpsRefund(Base):
         ),
         CheckConstraint("proof_key IS NULL OR paid_on IS NOT NULL", name="ops_refund_proof_paid"),
         CheckConstraint("NOT paid_early OR paid_on IS NOT NULL", name="ops_refund_early_paid"),
+        CheckConstraint(
+            "estebdal_state IS NULL OR estebdal_state IN ('waiting', 'choose', 'missing', 'done')",
+            name="ops_refund_estebdal_state_valid",
+        ),
+        # The rows to mark received in E-stebdal: paid, back, not done (ADR 0090).
+        Index(
+            "ix_ops_refund_estebdal_due",
+            "estebdal_tried_at",
+            postgresql_where=text(
+                "paid_on IS NOT NULL AND received_at IS NOT NULL "
+                "AND estebdal_state IS DISTINCT FROM 'done'"
+            ),
+        ),
         Index("ix_ops_refund_paid_on", "paid_on"),
         # The 30-minute read takes the rows not yet received.
         Index(
@@ -329,6 +342,26 @@ class OpsRefund(Base):
     #: The optional photo of the payment: its key in the file bucket, and type.
     proof_key: Mapped[str | None] = mapped_column(String(200))
     proof_type: Mapped[str | None] = mapped_column(String(20))
+    #: Marking it received in E-stebdal once paid and back (ADR 0090).
+    #: ``waiting`` (tried again later), ``choose`` (more than one approved
+    #: request: a person picks, from ``estebdal_choices``), ``missing`` (no
+    #: request to mark), ``done``; empty until first tried.
+    estebdal_state: Mapped[str | None] = mapped_column(String(10))
+    #: Why it is not done, in words fit to show.
+    estebdal_note: Mapped[str | None] = mapped_column(String(200))
+    #: ``[{"id", "number"}]``: the approved requests a person chooses from.
+    estebdal_choices: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    #: The request marked (or found already received), e.g. ``#32546-R1``.
+    estebdal_request: Mapped[str | None] = mapped_column(String(40))
+    estebdal_tried_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    estebdal_done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Whether E-stebdal emails the customer. False for rows already paid
+    #: when this went live, so nobody is told weeks late (decision 4).
+    estebdal_notify: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

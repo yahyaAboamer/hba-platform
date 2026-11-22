@@ -275,3 +275,99 @@ def test_the_estebdal_tab_is_for_operations_only(client, role, expected):
     with engine.begin() as connection:
         connection.execute(text("UPDATE role_assignment SET role = :r"), {"r": role})
     assert client.get("/api/order-ops/estebdal").status_code == expected
+
+
+# ── Marking a request received (ADR 0090) ─────────────────────────────────────
+
+
+def _write_client(handler) -> estebdal.EstebdalClient:
+    client = estebdal.EstebdalClient("all-access-key", transport=httpx.MockTransport(handler))
+    client.retry_base_seconds = 0
+    return client
+
+
+def _listing(*items, has_next=False):
+    return httpx.Response(200, json={"data": list(items), "meta": {"hasNextPage": has_next}, "warnings": []})
+
+
+def test_requests_for_an_order_keep_only_that_exact_order():
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return _listing(
+            _request("32546", status="Approved"),
+            _request("132546", status="Approved"),
+            {**_request("32546", status="Closed"), "id": "id-32546-b", "returnNumber": "#32546-R2"},
+        )
+
+    found = _write_client(handler).requests_for_order("#32546")
+
+    assert sorted((r["number"], r["status"]) for r in found) == [("#32546-R1", "Approved"), ("#32546-R2", "Closed")]
+    assert set(found[0]) == {"id", "number", "order_number", "status"}
+    sent = json.loads(seen[0].url.params["filter"])
+    assert sent == [{"field": "returnNumber", "operator": "contains", "value": "32546-R"}]
+    assert seen[0].headers["x-api-key"] == "all-access-key"
+
+
+def test_an_order_with_no_number_asks_nothing():
+    def handler(request):  # pragma: no cover - must not be called
+        raise AssertionError("asked E-stebdal")
+
+    assert _write_client(handler).requests_for_order(None) == []
+
+
+def test_mark_received_posts_once_with_the_email_choice():
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "data": {"status": "Processing", "cashRefundRecorded": True},
+                "warnings": [{"message": "Settlement note", "code": "W"}],
+            },
+        )
+
+    answer = _write_client(handler).mark_received("507f1f77bcf86cd799439011", notify=False)
+
+    assert answer == {"status": "Processing", "cash_refund_recorded": True, "warnings": ["Settlement note"]}
+    assert len(seen) == 1
+    assert seen[0].method == "POST"
+    assert seen[0].url.path == "/api/v1/public/returns/507f1f77bcf86cd799439011/received"
+    assert json.loads(seen[0].content) == {"notifyCustomer": False}
+    assert seen[0].headers["x-api-key"] == "all-access-key"
+
+
+def test_a_refusal_carries_estebdals_own_words():
+    def handler(request):
+        return httpx.Response(400, json={"error": {"message": "Return must be Approved", "code": "BAD"}})
+
+    with pytest.raises(estebdal.Rejected, match="Return must be Approved"):
+        _write_client(handler).mark_received("r1", notify=True)
+
+
+@pytest.mark.parametrize("status, raised", [(500, SourceUnavailable), (429, SourceUnavailable), (403, KeyRefused), (401, KeyRefused)])
+def test_a_failed_write_is_tried_once_only(status, raised):
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(status, json={})
+
+    with pytest.raises(raised):
+        _write_client(handler).mark_received("r1", notify=True)
+    assert len(seen) == 1
+
+
+def test_a_write_that_never_answers_is_unavailable_not_repeated():
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        raise httpx.ReadTimeout("slow")
+
+    with pytest.raises(SourceUnavailable):
+        _write_client(handler).mark_received("r1", notify=True)
+    assert len(seen) == 1
