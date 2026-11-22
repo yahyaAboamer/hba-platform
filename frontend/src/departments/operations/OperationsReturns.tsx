@@ -716,6 +716,57 @@ function PaidActions({ refund, onDone }: { refund: Refund; onDone: () => void })
   );
 }
 
+/** Khazenly gave no Shopify order number: a person types it, so the
+ * refund's E-stebdal request can be found (ADR 0090). Paid rows too. */
+export function OrderNumberForm({ refund, onDone }: { refund: Refund; onDone: () => void }) {
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const id = `ops-rt-order-${refund.id}`;
+
+  function save(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    api
+      .post(`/api/order-ops/returns/${refund.id}/order-number`, { order_number: value })
+      .then(onDone)
+      .catch((caught: unknown) => {
+        setError(failure(caught));
+        setBusy(false);
+      });
+  }
+
+  return (
+    <form className="ops-rt__order" onSubmit={save}>
+      <label className="field" htmlFor={id}>
+        <span className="field__label">Shopify order number</span>
+        <input
+          id={id}
+          className="input num"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="#32546"
+          inputMode="numeric"
+          maxLength={40}
+          required
+        />
+        <span className="field__hint">Khazenly didn't give one. It's needed to find the E-stebdal request.</span>
+      </label>
+      <div className="ops-kh__actions">
+        <button type="submit" className="button button--row" disabled={busy || value.trim() === ""}>
+          {busy ? "Saving…" : "Save order number"}
+        </button>
+      </div>
+      {error && (
+        <p className="notice notice--refused" role="alert">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
 /** A person must act: choose between two requests, there is none to mark,
  * or E-stebdal refused it and it is not sent again on its own. */
 function needsPerson(shown: Estebdal): boolean {
@@ -956,6 +1007,7 @@ function RefundRow({
                   {notice}
                 </p>
               )}
+              {canEdit && !refund.order_number && <OrderNumberForm refund={refund} onDone={onChanged} />}
               {paid && <Proof refund={refund} canEdit={canEdit} onDone={onChanged} />}
               {paid && <EstebdalStatus refund={refund} mode={estebdalMode} canEdit={canEdit} onDone={onChanged} />}
               {canEdit && !paid && refund.received_at === null && !payingEarly && (

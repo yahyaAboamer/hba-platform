@@ -245,6 +245,10 @@ class RefundUnpaid(BaseModel):
     reason: str = ""
 
 
+class RefundOrderNumber(BaseModel):
+    order_number: str = Field(default="", max_length=40)
+
+
 class RefundEstebdal(BaseModel):
     #: The request chosen, when the order has more than one approved.
     request_id: str | None = Field(default=None, max_length=64)
@@ -310,6 +314,26 @@ def mark_refund_paid(
     """Record that the refund was sent. Nothing is sent from here."""
     try:
         returns.mark_paid(db, refund_id, body.model_dump(exclude_unset=True), actor)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    except returns.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    return _row(db, refund_id)
+
+
+@router.post("/returns/{refund_id}/order-number")
+def add_refund_order_number(
+    refund_id: int,
+    body: RefundOrderNumber,
+    actor: UserAccount = Depends(RETURNS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Type the Shopify order number of a refund Khazenly gave none for,
+    so its E-stebdal request can be found. Only while it has none."""
+    try:
+        returns.set_order_number(db, refund_id, body.order_number, actor)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from None
     except returns.Refused as exc:

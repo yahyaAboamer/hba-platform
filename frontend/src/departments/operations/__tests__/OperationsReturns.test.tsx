@@ -572,3 +572,61 @@ describe("A request E-stebdal refused (ADR 0090)", () => {
     await waitFor(() => expect(sent).toEqual(["/api/order-ops/returns/7/estebdal"]));
   });
 });
+
+describe("Typing a missing Shopify order number (ADR 0090)", () => {
+  const NO_ORDER = refund({
+    id: 8,
+    khazenly_number: "KH-HBA-08999207",
+    order_number: null,
+    merchant_order: null,
+    group: "paid",
+    paid_on: "2026-11-20",
+    paid_by: "Mona",
+    estebdal: {
+      state: "missing",
+      note: "This refund has no Shopify order number, so its E-stebdal request can't be found.",
+      request: null,
+      done_at: null,
+      tried_at: minutesAgo(10),
+      choices: [],
+      due: true,
+    },
+  });
+
+  it("lets staff type it on a paid row, and sends it as typed", async () => {
+    const sent: { path: string; body: unknown }[] = [];
+    respond(tab([NO_ORDER], { estebdal_mode: "auto" }), (path, init) => {
+      sent.push({ path, body: JSON.parse(String(init.body)) });
+      return reply(200, { refund: { ...NO_ORDER, order_number: "#32033" } });
+    });
+    render(<OperationsReturns canEdit />);
+    await screen.findByRole("heading", { name: "Paid · 1" });
+    openGroup("Paid");
+    fireEvent.click(screen.getByText("KH-HBA-08999207"));
+    const save = screen.getByRole("button", { name: "Save order number" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/Shopify order number/), { target: { value: "32033" } });
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(sent).toEqual([{ path: "/api/order-ops/returns/8/order-number", body: { order_number: "32033" } }]),
+    );
+  });
+
+  it("offers it neither to a viewer nor on a row that has one", async () => {
+    respond(tab([NO_ORDER, refund({ id: 9, khazenly_number: "KH-HBA-09254008", group: "paid", paid_on: "2026-11-20" })]));
+    render(<OperationsReturns canEdit={false} />);
+    await screen.findByRole("heading", { name: "Paid · 2" });
+    openGroup("Paid");
+    fireEvent.click(screen.getByText("KH-HBA-08999207"));
+    expect(screen.queryByLabelText(/Shopify order number/)).toBeNull();
+    cleanup();
+    window.localStorage.clear();
+
+    respond(tab([refund({ id: 9, khazenly_number: "KH-HBA-09254008", group: "paid", paid_on: "2026-11-20" })]));
+    render(<OperationsReturns canEdit />);
+    await screen.findByRole("heading", { name: "Paid · 1" });
+    openGroup("Paid");
+    fireEvent.click(screen.getByText("KH-HBA-09254008"));
+    expect(screen.queryByLabelText(/Shopify order number/)).toBeNull();
+  });
+});
