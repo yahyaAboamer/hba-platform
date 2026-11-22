@@ -46,6 +46,8 @@ PAGE_SIZE = 250
 #: Far more pages than requests ever wait; a bound on trusting a cursor.
 MAX_PAGES = 20
 MAX_ATTEMPTS = 3
+#: The pages one order's requests may take (``requests_for_order``).
+ORDER_PAGES = 2
 
 DIDNT_ANSWER = "E-stebdal didn't answer."
 
@@ -76,9 +78,9 @@ class EstebdalClient:
     def __repr__(self) -> str:
         return "<EstebdalClient>"  # never the key
 
-    def _get(self, path: str, params: dict) -> dict:
+    def _get(self, path: str, params: dict, attempts: int = MAX_ATTEMPTS) -> dict:
         with httpx.Client(transport=self._transport, timeout=self._timeout) as http:
-            for attempt in range(MAX_ATTEMPTS):
+            for attempt in range(attempts):
                 if attempt:
                     time.sleep(self.retry_base_seconds * (2 ** (attempt - 1)))
                 try:
@@ -141,8 +143,9 @@ class EstebdalClient:
             return []
         query = json.dumps([{"field": "returnNumber", "operator": "contains", "value": f"{digits}-R"}])
         found: dict[str, dict] = {}
-        for page in range(1, MAX_PAGES + 1):
-            body = self._get("/returns", {"filter": query, "limit": PAGE_SIZE, "page": page})
+        # Bounded for the background run: an order has a handful of requests.
+        for page in range(1, ORDER_PAGES + 1):
+            body = self._get("/returns", {"filter": query, "limit": PAGE_SIZE, "page": page}, attempts=2)
             try:
                 for item in body["data"]:
                     if _digits(item.get("orderNumber")) != digits:
@@ -154,13 +157,13 @@ class EstebdalClient:
                         "status": str(item["status"]),
                     }
                 more = bool(body["meta"]["hasNextPage"])
-            except (KeyError, TypeError, ValueError):
+            except (AttributeError, KeyError, TypeError, ValueError):
                 raise SourceUnavailable(
                     "E-stebdal answered in a way Operations doesn't recognise."
                 ) from None
             if not more:
                 return list(found.values())
-        raise SourceUnavailable("E-stebdal returned more requests than Operations reads.")
+        raise SourceUnavailable("E-stebdal returned more requests for this order than Operations reads.")
 
     def mark_received(self, request_id: str, notify: bool) -> dict:
         """Mark one *Approved* request received: it becomes *Processing*,

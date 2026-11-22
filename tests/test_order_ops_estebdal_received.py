@@ -4,6 +4,7 @@ E-stebdal is never called: ``FakeEstebdal`` answers as its public API does
 (``openapi-public.json``, read 22 November 2026), with made-up requests.
 """
 
+from contextlib import contextmanager
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -78,6 +79,13 @@ def _refund(db, *, paid=True, received=True, order="#32546", number="KH-HBA-0925
     db.add(row)
     db.flush()
     return row
+
+
+@contextmanager
+def _same(db):
+    """The test's own session in place of one per row; flushed, not committed."""
+    yield db
+    db.flush()
 
 
 @pytest.fixture()
@@ -159,12 +167,20 @@ def test_a_row_with_no_order_number_asks_nothing(db):
     assert row.estebdal_state == "missing" and "no Shopify order number" in row.estebdal_note
 
 
-def test_a_refusal_keeps_estebdals_words_and_waits(db):
+def test_a_refusal_keeps_estebdals_words_and_waits_for_a_person(db, auto):
     row = _refund(db)
     fake = FakeEstebdal({"#32546": [_req("r1", "#32546-R1")]}, marks=estebdal.Rejected("Return must be Approved"))
     assert estebdal_received.send(db, row, fake) is False
-    assert row.estebdal_state == "waiting"
+    assert row.estebdal_state == "refused"
     assert row.estebdal_note == "E-stebdal refused it: Return must be Approved"
+
+    # The run never sends it again on its own; a person's Try again does.
+    row.estebdal_tried_at = utcnow() - timedelta(hours=1)
+    db.flush()
+    assert estebdal_received.send_due(db, fake, transaction=_same) == 0
+    fake.marks = None
+    estebdal_received.by_hand(db, row.id, _actor(db), client=fake)
+    assert row.estebdal_state == "done" and len(fake.marked) == 2
 
 
 @pytest.mark.parametrize(
@@ -217,30 +233,30 @@ def test_the_run_sends_only_rows_that_are_paid_and_back(db, auto):
     on_the_way = _refund(db, number="KH-HBA-3", order="#3", received=False)
     fake = FakeEstebdal({f"#{n}": [_req(f"r{n}", f"#{n}-R1", order=f"#{n}")] for n in (1, 2, 3)})
 
-    assert estebdal_received.send_due(db, fake) == 1
+    assert estebdal_received.send_due(db, fake, transaction=_same) == 1
     assert fake.marked == [("r1", True)]
     assert done.estebdal_state == "done"
     assert unpaid.estebdal_state is None and on_the_way.estebdal_state is None
 
     # Done is never sent again; a row tried a moment ago waits its turn.
-    assert estebdal_received.send_due(db, fake) == 0
+    assert estebdal_received.send_due(db, fake, transaction=_same) == 0
 
 
 def test_a_row_not_done_is_tried_again_after_fifteen_minutes(db, auto):
     row = _refund(db)
     fake = FakeEstebdal({"#32546": [_req("r1", "#32546-R1", "Needs Review")]})
-    assert estebdal_received.send_due(db, fake) == 1
-    assert estebdal_received.send_due(db, fake) == 0
+    assert estebdal_received.send_due(db, fake, transaction=_same) == 1
+    assert estebdal_received.send_due(db, fake, transaction=_same) == 0
     row.estebdal_tried_at = utcnow() - timedelta(minutes=16)
     db.flush()
-    assert estebdal_received.send_due(db, fake) == 1
+    assert estebdal_received.send_due(db, fake, transaction=_same) == 1
 
 
 def test_the_run_stops_after_three_failures_in_a_row(db, auto):
     for n in range(5):
         _refund(db, number=f"KH-HBA-{n}", order=f"#{n}")
     fake = FakeEstebdal(lists=SourceUnavailable("E-stebdal didn't answer."))
-    assert estebdal_received.send_due(db, fake) == 3
+    assert estebdal_received.send_due(db, fake, transaction=_same) == 3
 
 
 @pytest.mark.parametrize("mode", ["off", "manual"])
@@ -248,7 +264,7 @@ def test_the_run_sends_nothing_unless_the_switch_is_auto(db, monkeypatch, mode):
     monkeypatch.setattr(settings, "estebdal_mark_received", mode)
     row = _refund(db)
     fake = FakeEstebdal({"#32546": [_req("r1", "#32546-R1")]})
-    assert estebdal_received.send_due(db, fake) == 0
+    assert estebdal_received.send_due(db, fake, transaction=_same) == 0
     assert fake.marked == [] and row.estebdal_state is None
 
 
@@ -344,3 +360,28 @@ def test_staff_mark_it_received_over_http_and_a_viewer_cannot(client):
 
     again = client.post(f"/api/order-ops/returns/{refund_id}/estebdal", json={})
     assert again.status_code == 422 and "paid and back" in again.json()["detail"]
+
+
+def test_each_row_of_the_run_is_committed_on_its_own(fresh_database, monkeypatch):
+    """A send cannot be taken back, so a later row failing must not undo the
+    record of one already sent."""
+    monkeypatch.setattr(settings, "estebdal_mark_received", "auto")
+    with SessionLocal() as setup:
+        first = _refund(setup, number="KH-HBA-A", order="#1").id
+        second = _refund(setup, number="KH-HBA-B", order="#2").id
+        setup.commit()
+
+    class Breaks(FakeEstebdal):
+        def requests_for_order(self, order_number):
+            if order_number == "#2":
+                raise RuntimeError("a bug")
+            return super().requests_for_order(order_number)
+
+    fake = Breaks({"#1": [_req("r1", "#1-R1", order="#1")]})
+    with SessionLocal() as job, pytest.raises(RuntimeError):
+        estebdal_received.send_due(job, fake)
+
+    with SessionLocal() as check:
+        assert check.get(OpsRefund, first).estebdal_state == "done"
+        assert check.get(OpsRefund, second).estebdal_state is None
+        assert check.scalar(select(AuditEvent).where(AuditEvent.action == "order_ops.refund_estebdal_received")) is not None

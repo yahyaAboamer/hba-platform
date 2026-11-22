@@ -23,6 +23,7 @@ as done.
 
 import logging
 import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
@@ -30,6 +31,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.businesstime import utcnow
+from app.db import SessionLocal
 from app.modules.operations.models import OpsRefund
 from app.modules.operations.services import estebdal
 from app.modules.operations.services.polling import NotConnected, SourceUnavailable
@@ -50,7 +52,9 @@ ALREADY = ("Processing", "Closed")
 #: A row not done is tried again after this long by the background run.
 TRY_EVERY = timedelta(minutes=15)
 #: The most rows one run takes, and its bounds, as the Khazenly read's:
-#: well inside the operations lane's 5-minute lease.
+#: well inside the operations lane's 5-minute lease. One row's lookup and
+#: send are bounded too (``EstebdalClient.requests_for_order``), so a run
+#: ends within about 2 minutes plus one row.
 BATCH = 50
 BUDGET = timedelta(minutes=2)
 GIVE_UP_AFTER = 3
@@ -142,7 +146,9 @@ def send(
     try:
         answer = client.mark_received(request["id"], notify=notify)
     except estebdal.Rejected as exc:
-        _note(row, "waiting", f"E-stebdal refused it: {exc}", now)
+        # Refused outright for an approved request: not sent again until a
+        # person has looked and pressed *Try again*.
+        _note(row, "refused", f"E-stebdal refused it: {exc}", now)
         return False
     except (SourceUnavailable, NotConnected) as exc:
         _note(row, "waiting", _unavailable(exc), now)
@@ -173,23 +179,37 @@ def _unavailable(exc: Exception) -> str:
     return f"{exc} It will be tried again."
 
 
-def due_rows(db: Session, now: datetime) -> list[OpsRefund]:
-    """Paid, back, not done, and not tried in the last ``TRY_EVERY``,
-    least recently tried first."""
+def _due(now: datetime):
+    """Paid, back, neither done nor refused, and not tried in the last
+    ``TRY_EVERY``. A refused row waits for a person's *Try again*."""
+    return (
+        OpsRefund.paid_on.is_not(None),
+        OpsRefund.received_at.is_not(None),
+        OpsRefund.estebdal_state.is_distinct_from("done"),
+        OpsRefund.estebdal_state.is_distinct_from("refused"),
+        (OpsRefund.estebdal_tried_at.is_(None)) | (OpsRefund.estebdal_tried_at <= now - TRY_EVERY),
+    )
+
+
+def due_ids(db: Session, now: datetime) -> list[int]:
+    """The due rows, least recently tried first. Read without a lock: each
+    is locked on its own when its turn comes (``send_due``)."""
     return list(
         db.scalars(
-            select(OpsRefund)
-            .where(
-                OpsRefund.paid_on.is_not(None),
-                OpsRefund.received_at.is_not(None),
-                OpsRefund.estebdal_state.is_distinct_from("done"),
-                (OpsRefund.estebdal_tried_at.is_(None)) | (OpsRefund.estebdal_tried_at <= now - TRY_EVERY),
-            )
+            select(OpsRefund.id)
+            .where(*_due(now))
             .order_by(OpsRefund.estebdal_tried_at.asc().nulls_first(), OpsRefund.id)
             .limit(BATCH)
-            .with_for_update(skip_locked=True)
         )
     )
+
+
+@contextmanager
+def _own_transaction(_db: Session):
+    """A session of its own, committed when the row is finished."""
+    with SessionLocal() as own:
+        yield own
+        own.commit()
 
 
 def send_due(
@@ -197,36 +217,49 @@ def send_due(
     client: estebdal.EstebdalClient | None = None,
     budget_seconds: float | None = None,
     clock=time.monotonic,
+    transaction=_own_transaction,
 ) -> int:
     """The background run: every due row, bounded. Returns how many were
-    tried. Does nothing unless the switch is ``auto``."""
+    tried. Does nothing unless the switch is ``auto``.
+
+    **Each row is its own transaction**, locked, sent and committed alone,
+    not in the job's session. A send can email a customer and cannot be
+    taken back, so its record must not roll back with a row that fails
+    later in the run. A row a person is sending at that moment is skipped,
+    and no lock is held while other rows wait.
+    """
     if mode() != "auto":
         return 0
-    now = utcnow()
-    rows = due_rows(db, now)
-    if not rows:
+    ids = due_ids(db, utcnow())
+    if not ids:
         return 0
     try:
         client = client or _client_for(db)
     except NotConnected:
-        for row in rows:
-            _note(row, "waiting", _unavailable(NotConnected()), now)
-        db.flush()
+        logger.warning("returns: E-stebdal isn't connected; %d refunds wait", len(ids))
         return 0
     budget = BUDGET.total_seconds() if budget_seconds is None else budget_seconds
     started = clock()
     tried = 0
     failed_in_a_row = 0
-    for row in rows:
+    for refund_id in ids:
         if tried and clock() - started >= budget:
             break
         if failed_in_a_row >= GIVE_UP_AFTER:
             break
-        failed = send(db, row, client, now=utcnow())
+        now = utcnow()
+        with transaction(db) as own:
+            row = own.scalar(
+                select(OpsRefund)
+                .where(OpsRefund.id == refund_id, *_due(now))
+                .with_for_update(skip_locked=True)
+            )
+            if row is None:  # sent by hand meanwhile, or held by a person
+                continue
+            failed = send(own, row, client, now=now)
         tried += 1
         failed_in_a_row = failed_in_a_row + 1 if failed else 0
-    db.flush()
-    logger.info("returns: marked %d of %d due refunds in E-stebdal", tried, len(rows))
+    logger.info("returns: tried %d of %d due refunds in E-stebdal", tried, len(ids))
     return tried
 
 

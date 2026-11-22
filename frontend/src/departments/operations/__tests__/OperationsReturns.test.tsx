@@ -538,3 +538,37 @@ describe("Marking a paid refund received in E-stebdal (ADR 0090)", () => {
     expect(screen.getByText(/E-stebdal will still show it as received/)).toBeTruthy();
   });
 });
+
+describe("A request E-stebdal refused (ADR 0090)", () => {
+  it("asks a person to look, with Try again", async () => {
+    const refused = refund({
+      id: 7,
+      khazenly_number: "KH-HBA-09254009",
+      group: "paid",
+      paid_on: "2026-11-21",
+      paid_by: "Mona",
+      estebdal: {
+        state: "refused",
+        note: "E-stebdal refused it: Return must be Approved",
+        request: null,
+        done_at: null,
+        tried_at: minutesAgo(20),
+        choices: [],
+        due: true,
+      },
+    });
+    const sent: string[] = [];
+    respond(tab([refused], { estebdal_mode: "auto" }), (path) => {
+      sent.push(path);
+      return reply(200, { refund: refused });
+    });
+    render(<OperationsReturns canEdit />);
+    await screen.findByRole("heading", { name: "Paid · 1" });
+    openGroup("Paid");
+    expect(screen.getByText("E-stebdal needs you")).toBeTruthy();
+    fireEvent.click(screen.getByText("KH-HBA-09254009"));
+    expect(screen.getByText("E-stebdal refused it: Return must be Approved")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(sent).toEqual(["/api/order-ops/returns/7/estebdal"]));
+  });
+});

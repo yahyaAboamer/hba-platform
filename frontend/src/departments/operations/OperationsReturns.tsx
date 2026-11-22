@@ -66,7 +66,7 @@ export type Refund = {
 
 /** Marking it received in E-stebdal (ADR 0090). */
 export type Estebdal = {
-  state: "waiting" | "choose" | "missing" | "done" | null;
+  state: "waiting" | "choose" | "missing" | "refused" | "done" | null;
   note: string | null;
   request: string | null;
   done_at: string | null;
@@ -716,6 +716,12 @@ function PaidActions({ refund, onDone }: { refund: Refund; onDone: () => void })
   );
 }
 
+/** A person must act: choose between two requests, there is none to mark,
+ * or E-stebdal refused it and it is not sent again on its own. */
+function needsPerson(shown: Estebdal): boolean {
+  return shown.due && (shown.state === "choose" || shown.state === "missing" || shown.state === "refused");
+}
+
 /** Where marking this paid refund received in E-stebdal stands, and the
  * buttons that send it by hand (ADR 0090). */
 export function EstebdalStatus({
@@ -762,7 +768,7 @@ export function EstebdalStatus({
   const canSend = canEdit && mode !== "off" && shown.due;
   return (
     <div className="ops-rt__estebdal">
-      <p className={shown.state === "choose" || shown.state === "missing" ? "notice notice--refused" : "ops-muted"}>
+      <p className={needsPerson(shown) ? "notice notice--refused" : "ops-muted"}>
         <strong>E-stebdal: </strong>
         {words}
       </p>
@@ -881,9 +887,7 @@ function RefundRow({
     ...(refund.proof_url ? ["Photo"] : []),
     ...(paid && refund.estebdal.state === "done" ? ["Received in E-stebdal"] : []),
   ];
-  // A person must act: choose between two requests, or there is none to mark.
-  const estebdalNeedsYou =
-    paid && refund.estebdal.due && (refund.estebdal.state === "choose" || refund.estebdal.state === "missing");
+  const estebdalNeedsYou = paid && needsPerson(refund.estebdal);
 
   return (
     <li className="ops-rt__row">

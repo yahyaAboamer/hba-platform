@@ -285,7 +285,7 @@ class OpsRefund(Base):
         CheckConstraint("proof_key IS NULL OR paid_on IS NOT NULL", name="ops_refund_proof_paid"),
         CheckConstraint("NOT paid_early OR paid_on IS NOT NULL", name="ops_refund_early_paid"),
         CheckConstraint(
-            "estebdal_state IS NULL OR estebdal_state IN ('waiting', 'choose', 'missing', 'done')",
+            "estebdal_state IS NULL OR estebdal_state IN ('waiting', 'choose', 'missing', 'refused', 'done')",
             name="ops_refund_estebdal_state_valid",
         ),
         # The rows to mark received in E-stebdal: paid, back, not done (ADR 0090).
@@ -345,7 +345,8 @@ class OpsRefund(Base):
     #: Marking it received in E-stebdal once paid and back (ADR 0090).
     #: ``waiting`` (tried again later), ``choose`` (more than one approved
     #: request: a person picks, from ``estebdal_choices``), ``missing`` (no
-    #: request to mark), ``done``; empty until first tried.
+    #: request to mark), ``refused`` (E-stebdal refused it; not tried again
+    #: until a person does), ``done``; empty until first tried.
     estebdal_state: Mapped[str | None] = mapped_column(String(10))
     #: Why it is not done, in words fit to show.
     estebdal_note: Mapped[str | None] = mapped_column(String(200))

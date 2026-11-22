@@ -45,7 +45,14 @@ filter: its number is the order number followed by `-R1`, `-R2` and so on.
 3. **Paid never waits for E-stebdal.** *Mark paid* is saved the same way
    whether or not E-stebdal answers. Sending happens afterwards. A failure
    is kept on the row with a plain note, the row is tried again on the next
-   run, and *Try again* sends it at once.
+   run, and *Try again* sends it at once. The exception is an outright
+   refusal of an *Approved* request: it is marked *refused* and waits for a
+   person's *Try again*, so it is never sent every 15 minutes.
+   **Each row of the background run is its own transaction**, locked, sent
+   and committed alone. A send can email a customer and cannot be taken
+   back, so its record must not roll back with a later row's failure. This
+   is the one job that commits outside the session the worker gives it, and
+   the reason is this one.
 4. **The customer email stays on** for refunds paid after this goes live.
    Rows already paid when it went live (the sweep of old rows the owner
    asked for) are sent without the email, so nobody gets a "we received
@@ -75,7 +82,15 @@ filter: its number is the order number followed by `-R1`, `-R2` and so on.
 - E-stebdal emails the customer for new refunds.
 - A wrong order number on a row would mark the wrong request. The exact
   order-number match and the refusal to guess between two *Approved*
-  requests are the guards.
+  requests are the guards. A refund row is linked to an order, not to a
+  request, so the guard cannot tell requests apart in two cases:
+  - an order with a refunded R2 and a still-*Approved* R1 marks R1;
+  - an old *Closed* R1 next to a *Rejected* R2 reads as already received.
+  Both need two requests on one order, which the owner sees rarely, and the
+  row names the request it used.
+- E-stebdal's own words (a refusal, a warning) are shown on the row, as it
+  gave them, up to 200 characters. They never go into the activity log or
+  the server log.
 - E-stebdal documents no answer for "not Approved" other than `400`, and no
   way to test a key's write access without writing. A refused key first
   shows on a real send, as a note on the row.

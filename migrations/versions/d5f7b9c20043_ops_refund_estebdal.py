@@ -44,7 +44,7 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ops_refund_estebdal_state_valid",
         "ops_refund",
-        "estebdal_state IS NULL OR estebdal_state IN ('waiting', 'choose', 'missing', 'done')",
+        "estebdal_state IS NULL OR estebdal_state IN ('waiting', 'choose', 'missing', 'refused', 'done')",
     )
     op.create_index(
         "ix_ops_refund_estebdal_due",
