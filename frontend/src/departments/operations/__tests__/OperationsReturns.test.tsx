@@ -46,6 +46,7 @@ function refund(extra: Partial<Refund>): Refund {
     group: "ready",
     attention: [],
     tracking_url: "https://track.khazenly.com/?referenceNumber=KH-HBA-08997921&lang=en",
+    estebdal: { state: null, note: null, request: null, done_at: null, tried_at: null, choices: [], due: false },
     ...extra,
   };
 }
@@ -69,6 +70,7 @@ function tab(refunds: Refund[], extra: Partial<ReturnsTab> = {}): ReturnsTab {
       { value: "bank_transfer", label: "Bank transfer" },
       { value: "other", label: "Other" },
     ],
+    estebdal_mode: "off",
     ...extra,
   };
 }
@@ -432,5 +434,107 @@ describe("Paying before the return is back (ADR 0082)", () => {
     const image = screen.getByRole("img", { name: "Payment photo for KH-HBA-09000241" }) as HTMLImageElement;
     expect(image.getAttribute("src")).toBe("/api/order-ops/returns/3/proof?v=abc");
     expect(screen.queryByRole("button", { name: "Remove photo" })).toBeNull();
+  });
+});
+
+describe("Marking a paid refund received in E-stebdal (ADR 0090)", () => {
+  const DUE = refund({
+    id: 6,
+    khazenly_number: "KH-HBA-09254008",
+    order_number: "#32546",
+    group: "paid",
+    paid_on: "2026-11-21",
+    paid_by: "Mona",
+    estebdal: { state: null, note: null, request: null, done_at: null, tried_at: null, choices: [], due: true },
+  });
+
+  it("sends a paid, returned refund by hand when the server allows it", async () => {
+    const sent: { path: string; body: unknown }[] = [];
+    respond(tab([DUE], { estebdal_mode: "manual" }), (path, init) => {
+      sent.push({ path, body: JSON.parse(String(init.body)) });
+      return reply(200, { refund: DUE });
+    });
+    render(<OperationsReturns canEdit />);
+    await screen.findByRole("heading", { name: "Paid · 1" });
+    openGroup("Paid");
+    fireEvent.click(screen.getByText("KH-HBA-09254008"));
+    expect(screen.getByText("Not marked received in E-stebdal yet.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Mark received in E-stebdal" }));
+    await waitFor(() => expect(sent).toEqual([{ path: "/api/order-ops/returns/6/estebdal", body: {} }]));
+  });
+
+  it("offers no send when the server is off, nor to a viewer", async () => {
+    respond(tab([DUE], { estebdal_mode: "off" }));
+    render(<OperationsReturns canEdit />);
+    await screen.findByRole("heading", { name: "Paid · 1" });
+    openGroup("Paid");
+    fireEvent.click(screen.getByText("KH-HBA-09254008"));
+    expect(screen.queryByText(/E-stebdal:/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mark received in E-stebdal" })).toBeNull();
+    cleanup();
+    window.localStorage.clear(); // the folded groups are remembered
+
+    respond(tab([DUE], { estebdal_mode: "auto" }));
+    render(<OperationsReturns canEdit={false} />);
+    await screen.findByRole("heading", { name: "Paid · 1" });
+    openGroup("Paid");
+    fireEvent.click(screen.getByText("KH-HBA-09254008"));
+    expect(screen.getByText("It will be marked received in E-stebdal within 15 minutes.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Mark received in E-stebdal" })).toBeNull();
+  });
+
+  it("asks a person to choose between two approved requests", async () => {
+    const choose = refund({
+      ...DUE,
+      estebdal: {
+        state: "choose",
+        note: "Order #32546 has 2 approved requests in E-stebdal. Choose the one for this refund.",
+        request: null,
+        done_at: null,
+        tried_at: minutesAgo(3),
+        choices: [
+          { id: "r1", number: "#32546-R1" },
+          { id: "r2", number: "#32546-R2" },
+        ],
+        due: true,
+      },
+    });
+    const sent: unknown[] = [];
+    respond(tab([choose], { estebdal_mode: "auto" }), (_path, init) => {
+      sent.push(JSON.parse(String(init.body)));
+      return reply(200, { refund: choose });
+    });
+    render(<OperationsReturns canEdit />);
+    await screen.findByRole("heading", { name: "Paid · 1" });
+    openGroup("Paid");
+    expect(screen.getByText("E-stebdal needs you")).toBeTruthy();
+    fireEvent.click(screen.getByText("KH-HBA-09254008"));
+    fireEvent.click(screen.getByRole("button", { name: "Mark #32546-R2" }));
+    await waitFor(() => expect(sent).toEqual([{ request_id: "r2" }]));
+  });
+
+  it("says when it was marked, and that undoing paid leaves E-stebdal as it is", async () => {
+    const done = refund({
+      ...DUE,
+      estebdal: {
+        state: "done",
+        note: null,
+        request: "#32546-R1",
+        done_at: "2026-11-22T10:00:00+00:00",
+        tried_at: "2026-11-22T10:00:00+00:00",
+        choices: [],
+        due: false,
+      },
+    });
+    respond(tab([done], { estebdal_mode: "auto" }));
+    render(<OperationsReturns canEdit />);
+    await screen.findByRole("heading", { name: "Paid · 1" });
+    openGroup("Paid");
+    expect(screen.getByText("Received in E-stebdal")).toBeTruthy();
+    fireEvent.click(screen.getByText("KH-HBA-09254008"));
+    expect(screen.getByText(/Marked received in E-stebdal \(#32546-R1\)/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Try again|Mark received/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Undo paid" }));
+    expect(screen.getByText(/E-stebdal will still show it as received/)).toBeTruthy();
   });
 });
