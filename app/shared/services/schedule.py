@@ -64,6 +64,9 @@ SCHEDULE: dict[str, tuple[timedelta, dict]] = {
     # Operations → Returns (ADR 0079): Khazenly's tracking for the refunds
     # not yet back. A parcel moves in hours, not minutes.
     JobKind.ORDER_OPS_RETURNS: (timedelta(minutes=30), {}),
+    # Operations → Returns (ADR 0090): refunds paid and back, marked received
+    # in E-stebdal. Returns at once unless ESTEBDAL_MARK_RECEIVED is auto.
+    JobKind.ORDER_OPS_ESTEBDAL_RECEIVED: (timedelta(minutes=15), {}),
     # Delivered orders due their feedback question (ADR 0083). Returns at
     # once unless INBOX_FEEDBACK_ENABLED is set.
     JobKind.INBOX_FEEDBACK_SWEEP: (timedelta(minutes=30), {}),

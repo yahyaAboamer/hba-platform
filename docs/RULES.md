@@ -81,6 +81,11 @@ payroll without touching a maintainer screen.
   Completed*; paying earlier is allowed when the person confirms it is early
   (ADR 0082), and the row keeps being tracked. A paid row is locked except
   for its optional proof photo, and undoing it needs a reason.
+- **A refund that is paid and back is marked received in E-stebdal**
+  (ADR 0090), its one outside write: only the single *Approved* request on
+  that Shopify order, never a guess between two, and only where
+  `ESTEBDAL_MARK_RECEIVED` allows (production alone). Paid never waits for
+  it; undoing paid leaves E-stebdal as it is.
 - **A code use is every order that used her code** (ADR 0049, superseding
   D03's definition): delivered, pending, failed delivery, cancelled or
   refunded alike. *Orders counted* is delivered and pending only (F02).

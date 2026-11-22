@@ -1,5 +1,7 @@
 """Application settings, read once from the environment."""
 
+from typing import Literal
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -108,6 +110,11 @@ class Settings(BaseSettings):
     # live here until Settings can hold them encrypted (build plan, phase 6).
     bosta_api_key: str = ""
     estebdal_api_key: str = ""
+    #: **Whether this server marks refunds received in E-stebdal** (ADR 0090):
+    #: ``off`` sends nothing, ``manual`` only a person's click, ``auto`` also
+    #: the background run. There is one real E-stebdal, so only the
+    #: production service is ever set; staging stays ``off``.
+    estebdal_mark_received: Literal["off", "manual", "auto"] = "off"
 
     # The customer inbox (ADR 0059). The WhatsApp keys themselves are saved
     # from Settings, encrypted; nothing here is a secret.

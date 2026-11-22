@@ -228,6 +228,8 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "order_ops.refund_proof_removed": f"Removed the payment photo for {a.get('number') or '?'}",
         "order_ops.refund_unpaid": f"Undid the payment of the refund for {a.get('number') or '?'}",
         "order_ops.refund_deleted": f"Deleted the refund for {a.get('number') or '?'}",
+        "order_ops.refund_estebdal_received": f"Marked {a.get('request') or '?'} received in E-stebdal for the refund {a.get('number') or '?'}"
+        f"{', customer emailed' if a.get('emailed') else ', no email'}",
         "inbox.whatsapp_saved": "Saved the WhatsApp connection",
         "inbox.sending_changed": f"Turned WhatsApp sending {'on' if a.get('sending') else 'off'}",
         "inbox.tags_connection_saved": "Saved the Shopify connection that writes order tags",

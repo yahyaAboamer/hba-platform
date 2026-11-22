@@ -18,7 +18,9 @@ import "./OperationsDashboard.css";
  * attention, paid; each group folds. Viewers see it all; staff, the
  * manager and the admin (`returns.edit`) add, change and mark paid. A
  * refund can be marked paid before it is back when the person confirms it,
- * and carry an optional photo of the payment (ADR 0082).
+ * and carry an optional photo of the payment (ADR 0082). Once a refund is
+ * paid and back, its request is marked received in E-stebdal, so the team
+ * can close it there (ADR 0090); each paid row says where that stands.
  *
  * No approved frame exists for this tab; it is drawn from the Operations
  * dashboard's own pieces (heading, cards, panels, expanding rows).
@@ -59,7 +61,23 @@ export type Refund = {
   group: Group;
   attention: Reason[];
   tracking_url: string;
+  estebdal: Estebdal;
 };
+
+/** Marking it received in E-stebdal (ADR 0090). */
+export type Estebdal = {
+  state: "waiting" | "choose" | "missing" | "refused" | "done" | null;
+  note: string | null;
+  request: string | null;
+  done_at: string | null;
+  tried_at: string | null;
+  choices: { id: string; number: string }[];
+  /** Paid and back, and not done: it is sent, or may be by hand. */
+  due: boolean;
+};
+
+/** off: this server sends nothing; manual: a click sends; auto: also every 15 minutes. */
+export type EstebdalMode = "off" | "manual" | "auto";
 
 type Method = { value: string; label: string };
 
@@ -76,6 +94,7 @@ export type ReturnsTab = {
   tracking: { checked_at: string | null; every_minutes: number; khazenly_down: boolean };
   paid_shown: number;
   methods: Method[];
+  estebdal_mode: EstebdalMode;
 };
 
 type Added = { added: Refund[]; refused: { number: string; reason: string }[] };
@@ -675,7 +694,10 @@ function PaidActions({ refund, onDone }: { refund: Refund; onDone: () => void })
       <label className="field">
         <span className="field__label">Why is it no longer paid?</span>
         <input className="input" value={reason} onChange={(event) => setReason(event.target.value)} required minLength={3} maxLength={300} autoFocus />
-        <span className="field__hint">Kept in the activity log.</span>
+        <span className="field__hint">
+          Kept in the activity log.
+          {refund.estebdal.state === "done" && " E-stebdal will still show it as received."}
+        </span>
       </label>
       <div className="ops-kh__actions">
         <button type="submit" className="button button--danger" disabled={busy || reason.trim().length < 3}>
@@ -691,6 +713,92 @@ function PaidActions({ refund, onDone }: { refund: Refund; onDone: () => void })
         </p>
       )}
     </form>
+  );
+}
+
+/** A person must act: choose between two requests, there is none to mark,
+ * or E-stebdal refused it and it is not sent again on its own. */
+function needsPerson(shown: Estebdal): boolean {
+  return shown.due && (shown.state === "choose" || shown.state === "missing" || shown.state === "refused");
+}
+
+/** Where marking this paid refund received in E-stebdal stands, and the
+ * buttons that send it by hand (ADR 0090). */
+export function EstebdalStatus({
+  refund,
+  mode,
+  canEdit,
+  onDone,
+}: {
+  refund: Refund;
+  mode: EstebdalMode;
+  canEdit: boolean;
+  onDone: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const shown = refund.estebdal;
+
+  function send(requestId?: string) {
+    setBusy(requestId ?? "send");
+    setError(null);
+    api
+      .post(`/api/order-ops/returns/${refund.id}/estebdal`, requestId ? { request_id: requestId } : {})
+      .then(onDone)
+      .catch((caught: unknown) => setError(failure(caught)))
+      .finally(() => setBusy(null));
+  }
+
+  let words: string | null;
+  if (shown.state === "done") {
+    words = `Marked received in E-stebdal${shown.request ? ` (${shown.request})` : ""}${
+      shown.done_at ? ` on ${dayMonth(shown.done_at)}` : ""
+    }.${shown.note ? ` ${shown.note}` : ""}`;
+  } else if (mode === "off") {
+    words = null;
+  } else if (refund.received_at === null) {
+    words = "It will be marked received in E-stebdal once Khazenly says the return is completed.";
+  } else if (shown.state === null) {
+    words = mode === "auto" ? "It will be marked received in E-stebdal within 15 minutes." : "Not marked received in E-stebdal yet.";
+  } else {
+    words = shown.note;
+  }
+  if (!words) return null;
+
+  const canSend = canEdit && mode !== "off" && shown.due;
+  return (
+    <div className="ops-rt__estebdal">
+      <p className={needsPerson(shown) ? "notice notice--refused" : "ops-muted"}>
+        <strong>E-stebdal: </strong>
+        {words}
+      </p>
+      {canSend && (
+        <div className="ops-kh__actions">
+          {shown.state === "choose" ? (
+            shown.choices.map((choice) => (
+              <button
+                key={choice.id}
+                type="button"
+                className="button button--row"
+                disabled={busy !== null}
+                onClick={() => send(choice.id)}
+              >
+                {busy === choice.id ? "Marking…" : `Mark ${choice.number}`}
+              </button>
+            ))
+          ) : (
+            <button type="button" className="button button--row" disabled={busy !== null} onClick={() => send()}>
+              {busy ? "Marking…" : shown.state === null ? "Mark received in E-stebdal" : "Try again"}
+            </button>
+          )}
+        </div>
+      )}
+      {error && (
+        <p className="notice notice--refused" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -755,12 +863,14 @@ function RefundRow({
   methods,
   canEdit,
   now,
+  estebdalMode,
   onChanged,
 }: {
   refund: Refund;
   methods: Method[];
   canEdit: boolean;
   now: number;
+  estebdalMode: EstebdalMode;
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -775,7 +885,9 @@ function RefundRow({
     ...(refund.paid_early ? ["Paid before it was back"] : []),
     ...(stillComing ? [`Khazenly: ${refund.step ?? "not read yet"}`] : []),
     ...(refund.proof_url ? ["Photo"] : []),
+    ...(paid && refund.estebdal.state === "done" ? ["Received in E-stebdal"] : []),
   ];
+  const estebdalNeedsYou = paid && needsPerson(refund.estebdal);
 
   return (
     <li className="ops-rt__row">
@@ -816,13 +928,14 @@ function RefundRow({
                 ? dayAndTime(refund.step_at)
                 : ""}
           </small>
-          {(flags.length > 0 || tags.length > 0) && (
+          {(flags.length > 0 || tags.length > 0 || estebdalNeedsYou) && (
             <span className="ops-rt__flags">
               {flags.map((flag) => (
                 <span key={flag} className={flag === "details_missing" ? "ops-tag" : "ops-tag ops-rt__flag"}>
                   {REASON_WORDS[flag]}
                 </span>
               ))}
+              {estebdalNeedsYou && <span className="ops-tag ops-rt__flag">E-stebdal needs you</span>}
               {tags.map((tag) => (
                 <span key={tag} className="ops-tag">
                   {tag}
@@ -844,6 +957,7 @@ function RefundRow({
                 </p>
               )}
               {paid && <Proof refund={refund} canEdit={canEdit} onDone={onChanged} />}
+              {paid && <EstebdalStatus refund={refund} mode={estebdalMode} canEdit={canEdit} onDone={onChanged} />}
               {canEdit && !paid && refund.received_at === null && !payingEarly && (
                 <div className="ops-kh__actions">
                   <button type="button" className="button button--row" onClick={() => setPayingEarly(true)}>
@@ -1269,6 +1383,7 @@ export function OperationsReturns({ canEdit }: { canEdit: boolean }) {
                             methods={tab.methods}
                             canEdit={canEdit}
                             now={now}
+                            estebdalMode={tab.estebdal_mode}
                             onChanged={reload}
                           />
                         ))}

@@ -108,6 +108,10 @@ class JobKind:
     #: refund not yet back, every 30 minutes
     #: (app.modules.operations.services.returns).
     ORDER_OPS_RETURNS = "order_ops_track_returns"
+    #: Operations → Returns (ADR 0090): mark the refunds that are paid and
+    #: back received in E-stebdal, when ``ESTEBDAL_MARK_RECEIVED`` is ``auto``
+    #: (app.modules.operations.services.estebdal_received).
+    ORDER_OPS_ESTEBDAL_RECEIVED = "order_ops_estebdal_received"
 
     #: Decide whether one order gets a WhatsApp confirmation, and record it
     #: (ADR 0059). One per order, queued when the order is first indexed.
@@ -195,6 +199,7 @@ OPERATIONS_READS = frozenset(
         JobKind.ORDER_OPS_BOSTA,
         JobKind.ORDER_OPS_ESTEBDAL,
         JobKind.ORDER_OPS_RETURNS,
+        JobKind.ORDER_OPS_ESTEBDAL_RECEIVED,
     }
 )
 

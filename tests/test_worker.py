@@ -481,5 +481,7 @@ def test_between_them_the_lanes_take_every_kind_and_only_one_tops_up():
         JobKind.ORDER_OPS_ESTEBDAL,
         # Returns' Khazenly read (ADR 0079): bounded to 3 minutes, inside the lease.
         JobKind.ORDER_OPS_RETURNS,
+        # Marking refunds received in E-stebdal (ADR 0090): bounded to 2 minutes.
+        JobKind.ORDER_OPS_ESTEBDAL_RECEIVED,
     }
     assert LANES["operations"]["lease_seconds"] > LANES["main"]["lease_seconds"]
