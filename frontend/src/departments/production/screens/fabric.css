@@ -1,0 +1,6 @@
+/* ── Fabric storage on an order and the New order form (ADR 0089) ── */
+.prod-fabric-line { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-bottom: 10px; }
+.prod-fabric-take { margin-top: 12px; }
+@media (max-width: 860px) {
+  .prod-fabric-line { grid-template-columns: minmax(0, 1fr); }
+}

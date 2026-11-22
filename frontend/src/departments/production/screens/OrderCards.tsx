@@ -517,6 +517,8 @@ export function CostCard({ order, powers, open, run }: CardProps & { run: Run })
   const [confirming, setConfirming] = useState<string | null>(null);
   if (!cost) return null;
   const bought = cost.from_purchases;
+  // What the fabric taken from storage cost (ADR 0089): offered, never written without the owner.
+  const storage = order.fabric_cost ?? null;
   const canUse = powers.isOwner && isOpen(order);
 
   /** Set one part's actual cost to what the purchases say, through the order's own edit. */
@@ -592,6 +594,20 @@ export function CostCard({ order, powers, open, run }: CardProps & { run: Run })
                           </div>
                         )}
                         {part.actual_piastres === each && <div className="prod-small">This is already the actual cost.</div>}
+                      </div>
+                    )}
+                    {part.part === "fabric" && storage && storage.per_piece_piastres !== null && (
+                      <div className="prod-from">
+                        <span className="prod-small">From fabric storage: {formatEgp(storage.per_piece_piastres)} per piece</span>
+                        <div className="prod-small">
+                          {formatEgp(storage.total_piastres)} for the fabric this order took, over {pieces(storage.pieces)} {storage.basis} pieces
+                        </div>
+                        {canUse && part.actual_piastres !== storage.per_piece_piastres && (
+                          <button type="button" className="button button--row" disabled={busy} onClick={() => use(part, storage.per_piece_piastres as number)}>
+                            Use this<span className="prod-sr"> for {part.label}: {formatEgp(storage.per_piece_piastres)} per piece, from fabric storage</span>
+                          </button>
+                        )}
+                        {part.actual_piastres === storage.per_piece_piastres && <div className="prod-small">This is already the actual cost.</div>}
                       </div>
                     )}
                   </td>

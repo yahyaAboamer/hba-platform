@@ -55,6 +55,7 @@ from app.modules.production.orders.models import (
     ProdSupplierSection,
 )
 from app.modules.production.orders.services import account, ratings
+from app.modules.production.orders.services import fabric as storage
 from app.modules.production.orders.services.files import MAX_BYTES, file_type
 from app.modules.production.orders.services.orders import (
     Facts,
@@ -484,6 +485,9 @@ def add_purchase(db: Session, supplier_id: str, data: dict, actor: UserAccount) 
     )
     if twin is not None:
         raise _twice("purchase")
+    # Where its kilos go in fabric storage (ADR 0089), checked before anything
+    # is written; the fabric is locked after the order and the supplier.
+    into, fresh = storage.purchase_target(db, data, part=part, unit=unit)
     purchase = ProdPurchase(
         supplier_id=supplier.id, order_id=order.id if order else None, item=item, quantity=quantity, unit=unit,
         unit_price_piastres=price, total_piastres=total, cost_part=part, expected_on=data.get("expected_on"),
@@ -501,6 +505,7 @@ def add_purchase(db: Session, supplier_id: str, data: dict, actor: UserAccount) 
             purchase_id=purchase.id, order_id=purchase.order_id, method=method, payment_kind="deposit",
             actor_id=actor.id,
         )
+    storage.fill(db, purchase, into, fresh, actor)
     for_order = f" for {order.code}" if order else ""
     _audit(
         db, _subject(supplier), actor, "purchase_added",
@@ -532,6 +537,10 @@ def edit_purchase(
     db.refresh(purchase)
     if purchase.voided_at is not None:
         raise Locked("This purchase was voided. Nothing on it can change now.")
+    if any(key in data for key in ("quantity", "unit", "part")):
+        if storage.filled_by(db, purchase.id) is not None:
+            raise Refused("This purchase filled fabric storage; void it and record it again to change the kilos.")
+        raise Refused("What was bought, and how much, never changes on a purchase. Void it and record it again.")
     subject = _subject(supplier)
     bought = _bought_on(db, purchase.id)
     if bought is not None and data.get("expected_on") is not None and data["expected_on"] < bought:
@@ -610,6 +619,9 @@ def void_purchase(
     has_deposit = any(line.kind == "payment" for line in lines)
     if has_deposit and deposit_returned is None:
         raise Refused("This purchase has a deposit. Say whether the supplier returned it.")
+    # Its kilos leave fabric storage with it (ADR 0089); refused before
+    # anything changes while orders already use them.
+    filled = storage.check_void(db, purchase)
     purchase.voided_at = utcnow()
     purchase.voided_by = actor.id
     purchase.void_reason = reason
@@ -618,6 +630,7 @@ def void_purchase(
             continue
         _reverse_line(db, line, reason, actor)
     db.flush()
+    storage.void(db, purchase, filled, actor)
     about = ""
     if has_deposit:
         about = ", the deposit was returned" if deposit_returned else ", the supplier keeps the deposit as credit"

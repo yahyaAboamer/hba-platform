@@ -372,3 +372,10 @@ img.prod-photo { background: #ececea; object-fit: contain; padding: 2px; box-siz
   .prod-photo--big { width: 72px; height: 72px; }
 }
 .prod-lib-thumb { width: 28px; height: 28px; margin-right: 6px; border-radius: 4px; object-fit: cover; vertical-align: middle; background: #ececea; }
+
+/* ── Billing (ADR 0089) ── */
+.prod-bill-totals { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 12px 0; padding: 0; }
+.prod-bill-totals div { display: flex; flex-direction: column; }
+.prod-bill-totals dt { font-size: 12.5px; color: var(--quiet); }
+.prod-bill-totals dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.prod-bill-offer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }

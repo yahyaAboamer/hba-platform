@@ -90,6 +90,15 @@ def _write(db: Session, actor: UserAccount, act) -> dict:
 # ── Bodies ────────────────────────────────────────────────────────────────────
 
 
+class FabricLine(BaseModel):
+    """Kilos of one fabric a New order takes from storage (ADR 0089)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fabric_id: int = Field(ge=1, le=2_147_483_647)
+    kg: Decimal = Field(allow_inf_nan=False, max_digits=20)
+
+
 class NewOrder(BaseModel):
     style_name: str = Field(max_length=400)
     colour: str = Field(max_length=200)
@@ -114,6 +123,9 @@ class NewOrder(BaseModel):
     fabric_type: str | None = Field(default=None, max_length=400)
     decoration_type: str | None = Field(default=None, max_length=400)
     decoration_width_cm: Decimal | None = Field(default=None, allow_inf_nan=False, max_digits=12)
+    #: The fabric it takes from storage (ADR 0089): at most ten lines, each
+    #: fabric once. Only when HBA buys the fabric.
+    fabric: list[FabricLine] | None = Field(default=None, max_length=10)
 
 
 class OrderEdit(BaseModel):
@@ -773,8 +785,8 @@ def save_stage_days(
 @router.get("/choices")
 def choices(db: Session = Depends(get_session)) -> dict:
     """What the New order form needs: active suppliers, the active and draft
-    Shopify products (with status and picture), the sizes and the typical days
-    per stage."""
+    Shopify products (with status and picture), the sizes, the typical days
+    per stage and the active fabrics in storage with their kilos (no price)."""
     return orders.choices(db)
 
 
@@ -785,3 +797,10 @@ def choices(db: Session = Depends(get_session)) -> dict:
 from app.modules.production.orders import suppliers_api  # noqa: E402
 
 router.routes.extend(suppliers_api.router.routes)
+
+# ── Billing and fabric storage (ADR 0089) ─────────────────────────────────────
+# Their routes are in ``fabric_api``, built and appended the same way.
+
+from app.modules.production.orders import fabric_api  # noqa: E402
+
+router.routes.extend(fabric_api.router.routes)

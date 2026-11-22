@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../../../lib/api";
+import { NO_FABRIC, fabricBody, fabricLabel, fabricProblem, offersStorage, storageChoices } from "./billingLogic";
+import type { FabricChoice } from "./billingLogic";
 import { cairoToday } from "./format";
 import { METHODS, PARTS, UNITS, UNIT_PER, oldestDay, perPieceSentence, purchaseBody, purchaseProblem, purchaseSentence, purchaseSums } from "./supplierLogic";
 import type { PurchaseDraft } from "./supplierLogic";
-import type { OrderRow, PayMethod, PurchasePart, PurchaseUnit, SupplierAnswer } from "./types";
+import type { ChoiceFabric, FabricRow, OrderRow, PayMethod, PurchasePart, PurchaseUnit, SupplierAnswer } from "./types";
 import { Actions, DateBox, PanelShell, Problem, SelectBox, TextBox, useSubmit } from "./ui";
 import type { Run } from "./ui";
 
 type OrdersAnswer = { orders: OrderRow[] };
+type FabricsAnswer = { fabrics: FabricRow[] };
 
 /**
  * Record a purchase (the owner's): what was bought, how much, at what price, for which order, and an
@@ -44,6 +47,8 @@ export function PurchaseForm({
   });
   const [orders, setOrders] = useState<OrderRow[] | null>(null);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [fabric, setFabric] = useState<FabricChoice>(NO_FABRIC);
+  const [fabrics, setFabrics] = useState<ChoiceFabric[] | null>(null);
   const { error, busy, submit } = useSubmit(run);
 
   // The orders still in production, to pick the one the purchase is for.
@@ -62,6 +67,23 @@ export function PurchaseForm({
       current = false;
     };
   }, []);
+
+  // The fabrics in storage, read once, the first time fabric bought by the kilo is on the form.
+  const storage = offersStorage(draft.part, draft.unit);
+  useEffect(() => {
+    if (!storage || fabrics !== null) return;
+    let current = true;
+    api.get<FabricsAnswer>("/api/prod/fabrics")
+      .then((answer) => {
+        if (current) setFabrics(storageChoices(answer.fabrics));
+      })
+      .catch(() => {
+        if (current) setFabrics([]); // storage is optional: a bill can be recorded without it
+      });
+    return () => {
+      current = false;
+    };
+  }, [storage, fabrics]);
 
   const set = (patch: Partial<PurchaseDraft>) => setDraft((before) => ({ ...before, ...patch }));
   const sums = purchaseSums(draft);
@@ -82,8 +104,8 @@ export function PurchaseForm({
         onSubmit={(event) => {
           event.preventDefault();
           submit(
-            purchaseProblem(draft, today),
-            () => api.post<SupplierAnswer>(`/api/prod/suppliers/${draft.supplierId}/purchases`, purchaseBody(draft)),
+            purchaseProblem(draft, today) ?? fabricProblem(draft.part, draft.unit, fabric),
+            () => api.post<SupplierAnswer>(`/api/prod/suppliers/${draft.supplierId}/purchases`, { ...purchaseBody(draft), ...fabricBody(draft.part, draft.unit, fabric) }),
             `Purchase recorded: ${draft.item.trim()}${name ? ` from ${name}` : ""}.`,
           );
         }}
@@ -134,6 +156,28 @@ export function PurchaseForm({
           {sentence ?? "Give the quantity and the price to see the total."}
           {perPieceWords && <div>{perPieceWords}</div>}
         </div>
+        {storage && (
+          <>
+            <SelectBox
+              label="Put into fabric storage"
+              wide={fabric.pick !== "new"}
+              value={fabric.pick}
+              onChange={(value) => setFabric((before) => ({ ...before, pick: value }))}
+              options={[
+                { value: "", label: fabrics === null ? "Loading fabrics…" : "Not into storage" },
+                ...(fabrics ?? []).map((row) => ({ value: String(row.id), label: fabricLabel(row) })),
+                { value: "new", label: "A new fabric" },
+              ]}
+              hint="The kilos you bought are added to that fabric in storage."
+            />
+            {fabric.pick === "new" && (
+              <>
+                <TextBox label="New fabric name" value={fabric.name} onChange={(value) => setFabric((before) => ({ ...before, name: value }))} max={120} />
+                <TextBox label="Colour, optional" value={fabric.colour} onChange={(value) => setFabric((before) => ({ ...before, colour: value }))} max={60} />
+              </>
+            )}
+          </>
+        )}
         <Actions error={error} busy={busy} label="Save purchase" working="Saving…" />
       </form>
     </PanelShell>

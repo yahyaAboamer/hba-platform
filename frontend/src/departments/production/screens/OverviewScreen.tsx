@@ -177,6 +177,8 @@ export function OverviewScreen({ session }: { session: Session }) {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(ORDER_PAGE_SIZES[0]);
+  const [decisionPageAsked, setDecisionPage] = useState(0);
+  const [decisionSize, setDecisionSize] = useState(ORDER_PAGE_SIZES[0]);
   // Which answer is the newest: an answer that an earlier request delivers late, or one for a screen
   // that has been left, is dropped.
   const latest = useRef(0);
@@ -212,6 +214,10 @@ export function OverviewScreen({ session }: { session: Session }) {
   const lastPage = Math.max(0, Math.ceil(ordered.length / pageSize) - 1);
   const shownPage = Math.min(page, lastPage);
   const pageRows = ordered.slice(shownPage * pageSize, (shownPage + 1) * pageSize);
+  // The decisions too, five at a time (the owner, 21 November 2026), in the order the server sends them.
+  const decisions = data?.decisions ?? [];
+  const decisionPage = Math.min(decisionPageAsked, Math.max(0, Math.ceil(decisions.length / decisionSize) - 1));
+  const decisionRows = decisions.slice(decisionPage * decisionSize, (decisionPage + 1) * decisionSize);
 
   return (
     <>
@@ -250,11 +256,26 @@ export function OverviewScreen({ session }: { session: Session }) {
               {data.decisions.length === 0 ? (
                 <p className="empty">{isOwner ? "Nothing is waiting for you." : "Nothing is waiting for the owner."}</p>
               ) : (
-                <ul className="prod-tasks">
-                  {data.decisions.map((item) => (
-                    <DecisionRow key={item.key} item={item} today={data.today} powers={powers} narrow={narrow} />
-                  ))}
-                </ul>
+                <>
+                  <ul className="prod-tasks">
+                    {decisionRows.map((item) => (
+                      <DecisionRow key={item.key} item={item} today={data.today} powers={powers} narrow={narrow} />
+                    ))}
+                  </ul>
+                  {data.decisions.length > ORDER_PAGE_SIZES[0] && (
+                    <Pager
+                      page={decisionPage}
+                      size={decisionSize}
+                      total={data.decisions.length}
+                      sizes={ORDER_PAGE_SIZES}
+                      onPage={setDecisionPage}
+                      onSize={(size) => {
+                        setDecisionSize(size);
+                        setDecisionPage(0);
+                      }}
+                    />
+                  )}
+                </>
               )}
             </Card>
             <Card id="prod-ov-problems" title="Problems right now">
