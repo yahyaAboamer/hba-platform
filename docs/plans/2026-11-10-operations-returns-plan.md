@@ -213,6 +213,16 @@ One batch, one pull request. Merge and deploy only on the owner's word.
 - **Email:** customers are emailed for refunds paid after migration
   `d5f7b9c20043`. Rows already paid then are sent without the email.
 - **Undo paid** leaves E-stebdal received, because it can't be taken back.
+- **A missing Shopify order number can be typed.** It is allowed on a paid
+  row and only while the row has none, and the row is looked up in
+  E-stebdal again. Two paid refunds were added without one; the owner
+  asked for this on 22 November.
+- **Live 22 November:** production is on `auto`. The test #32546-R1 went
+  *Processing*, then the team closed it. The first run handled the 19
+  older rows: 11 done (no email), 1 to choose (#32488), 5 with no
+  E-stebdal request at all, and 2 with no Shopify number. The old key was
+  deleted in E-stebdal and removed from `ESTEBDAL_API_KEY` on production
+  and staging. Staging now has no E-stebdal key.
 - **Going live** (each step on the owner's word):
   1. deploy;
   2. set production to `manual`;
