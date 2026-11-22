@@ -1,7 +1,9 @@
 """Operations → Returns: refunds owed to customers, and whether sent (ADR 0079).
 
 **A record, never a payment.** Nothing here moves money, writes to Shopify
-or Khazenly, or is read by anything that decides pay.
+or Khazenly, or is read by anything that decides pay. Its one outside write
+is marking a paid, returned refund received in E-stebdal
+(``estebdal_received``, ADR 0090).
 
 Each row is one customer owed a refund for a return or an exchange. It is
 added by its Khazenly number; Khazenly's public tracking
@@ -27,6 +29,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.businesstime import BUSINESS_TIMEZONE, business_date, utcnow
 from app.modules.operations.models import REFUND_KINDS, REFUND_METHODS, OpsRefund
 from app.modules.operations.services import khazenly_tracking as tracking
@@ -783,6 +786,21 @@ def serialise(row: OpsRefund, now: datetime | None = None, names: dict[int, str]
         "group": group_of(row, now),
         "attention": attention(row, now),
         "tracking_url": TRACKING_URL.format(number=row.khazenly_number),
+        "estebdal": _estebdal(row),
+    }
+
+
+def _estebdal(row: OpsRefund) -> dict:
+    """Where marking it received in E-stebdal stands (ADR 0090). ``due``:
+    paid and back, so it is sent (or may be, by hand)."""
+    return {
+        "state": row.estebdal_state,
+        "note": row.estebdal_note,
+        "request": row.estebdal_request,
+        "done_at": _iso(row.estebdal_done_at),
+        "tried_at": _iso(row.estebdal_tried_at),
+        "choices": row.estebdal_choices or [],
+        "due": row.paid_on is not None and row.received_at is not None and row.estebdal_state != "done",
     }
 
 
@@ -850,5 +868,7 @@ def tab(db: Session, now: datetime | None = None) -> dict:
             "khazenly_down": khazenly_down,
         },
         "paid_shown": PAID_SHOWN,
+        # off, manual or auto (ADR 0090): the tab offers a send only when not off.
+        "estebdal_mode": settings.estebdal_mark_received,
         "methods": [{"value": value, "label": METHOD_WORDS[value]} for value in REFUND_METHODS],
     }

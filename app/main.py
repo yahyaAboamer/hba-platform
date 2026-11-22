@@ -68,6 +68,7 @@ from app.modules.operations.services import bosta as _order_ops_bosta  # noqa: F
 from app.modules.operations.services import estebdal as _order_ops_estebdal  # noqa: F401  (registers handlers)
 from app.modules.operations.services import shopify as _order_ops_shopify  # noqa: F401  (registers handlers)
 from app.modules.operations.services import returns as _order_ops_returns  # noqa: F401  (registers handlers)
+from app.modules.operations.services import estebdal_received as _order_ops_estebdal_received  # noqa: F401  (registers handlers)
 from app.shared.services.shopify import bulk as _shopify_bulk  # noqa: F401  (registers handlers)
 from app.shared.services.shopify import sync as _shopify_sync  # noqa: F401  (registers handlers)
 

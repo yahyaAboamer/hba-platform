@@ -24,7 +24,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.shared.api.deps import require_any_permission, require_permission
@@ -32,7 +32,7 @@ from app.core.permissions import Permission
 from app.db import get_session
 from app.shared.models.identity import UserAccount
 from app.shared.services.audit import record_audit
-from app.modules.operations.services import bosta, connections, estebdal, khazenly, returns, shopify
+from app.modules.operations.services import bosta, connections, estebdal, estebdal_received, khazenly, returns, shopify
 from app.modules.operations.services.freshness import SOURCES, State, describe, has_numbers
 
 logger = logging.getLogger(__name__)
@@ -245,6 +245,11 @@ class RefundUnpaid(BaseModel):
     reason: str = ""
 
 
+class RefundEstebdal(BaseModel):
+    #: The request chosen, when the order has more than one approved.
+    request_id: str | None = Field(default=None, max_length=64)
+
+
 def _refused(exc: returns.Refused) -> HTTPException:
     return HTTPException(409 if isinstance(exc, returns.Locked) else 422, str(exc))
 
@@ -305,6 +310,27 @@ def mark_refund_paid(
     """Record that the refund was sent. Nothing is sent from here."""
     try:
         returns.mark_paid(db, refund_id, body.model_dump(exclude_unset=True), actor)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    except returns.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    return _row(db, refund_id)
+
+
+@router.post("/returns/{refund_id}/estebdal")
+def mark_refund_received_in_estebdal(
+    refund_id: int,
+    body: RefundEstebdal,
+    actor: UserAccount = Depends(RETURNS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Mark this paid, returned refund's request received in E-stebdal now
+    (ADR 0090): *Mark received in E-stebdal*, *Try again*, or a choice
+    between two approved requests. What E-stebdal said is kept on the row."""
+    try:
+        estebdal_received.by_hand(db, refund_id, actor, choice=body.request_id)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from None
     except returns.Refused as exc:
