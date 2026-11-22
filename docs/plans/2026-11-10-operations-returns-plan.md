@@ -195,7 +195,35 @@ One batch, one pull request. Merge and deploy only on the owner's word.
   open, *On the way back* and *Paid* folded; each person's choice is kept
   in their browser. A search opens every group it found something in.
 
+## Added 22 November 2026 (ADR 0090, the owner)
+
+- **Marked received in E-stebdal.** A refund that is paid **and** back
+  (*Return Completed*) has its E-stebdal request marked received, so it
+  moves to *Processing* and the team can close it there, which is what
+  takes the sale out of E-stebdal's and Shopify's reports. The one
+  *Approved* request on that Shopify order is used. Two approved requests
+  wait for a person to choose, and nothing is guessed. A request still in
+  review is tried again. One already *Processing* or *Closed* counts as
+  done. *Paid* never waits for E-stebdal.
+- **Switch** `ESTEBDAL_MARK_RECEIVED`:
+  - `off`: the default, and staging stays on it.
+  - `manual`: only a person's *Mark received in E-stebdal* sends.
+  - `auto`: also the 15-minute job `order_ops_estebdal_received`, which
+    also sweeps the older paid rows.
+- **Email:** customers are emailed for refunds paid after migration
+  `d5f7b9c20043`. Rows already paid then are sent without the email.
+- **Undo paid** leaves E-stebdal received, because it can't be taken back.
+- **Going live** (each step on the owner's word):
+  1. deploy;
+  2. set production to `manual`;
+  3. mark #32546-R1 (Khazenly 09254008) by hand and check it in E-stebdal;
+  4. set `auto`;
+  5. revoke the old key in E-stebdal and remove it from Railway's
+     `ESTEBDAL_API_KEY`.
+- **Release gate:** migration `d5f7b9c20043` joins the rollback-rehearsal list.
+  It was rehearsed up → down → up on the disposable database on 22 November.
+
 ## Not in scope
 
-Paying anyone; writing to Shopify or Khazenly; fees or deductions; changing
+Paying anyone; writing to Shopify or Khazenly (E-stebdal's *received* is the one write, ADR 0090); fees or deductions; changing
 model pay; importing the old Google Sheet; Bosta returns.
