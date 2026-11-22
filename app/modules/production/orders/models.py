@@ -743,3 +743,103 @@ class ProdLibraryFile(Base):
     uploaded_by: Mapped[int | None] = _user()
     created_at: Mapped[datetime] = _created()
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# ── Billing and fabric storage (ADR 0089) ─────────────────────────────────────
+
+#: How kilos of fabric move in and out of storage. ``purchase`` and ``return``
+#: put kilos in, ``use`` and ``void`` take them out, ``count`` corrects either way.
+FABRIC_MOVE_KINDS = ("purchase", "use", "return", "count", "void")
+
+
+class ProdPurchasePhoto(Base):
+    """A photo or PDF of a bill (a purchase's receipt), in the file bucket
+    under ``production/bills/{purchase_id}/``. Removed with ``deleted_at``;
+    the stored copy stays. A payment's receipts stay in
+    ``prod_supplier_receipt``."""
+
+    __tablename__ = "prod_purchase_photo"
+    __table_args__ = (
+        CheckConstraint("size_bytes >= 0", name="prod_purchase_photo_size_not_negative"),
+        Index("ix_prod_purchase_photo_purchase", "purchase_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    purchase_id: Mapped[int] = mapped_column(Integer, ForeignKey("prod_purchase.id"), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(300), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    uploaded_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProdFabric(Base):
+    """A named roll type kept in storage. **Its stock is never stored**: it is
+    the sum of its movements (``prod_fabric_move``). Names are unique whatever
+    their case, among every fabric, retired ones included."""
+
+    __tablename__ = "prod_fabric"
+    __table_args__ = (
+        CheckConstraint("char_length(name) BETWEEN 1 AND 120", name="prod_fabric_name_length"),
+        Index("uq_prod_fabric_name", text("lower(name)"), unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    fabric_type: Mapped[str | None] = mapped_column(String(400))
+    colour: Mapped[str | None] = mapped_column(String(80))
+    colour_code: Mapped[str | None] = mapped_column(String(200))
+    #: The usual supplier.
+    supplier_id: Mapped[str | None] = mapped_column(String(80), ForeignKey("production_supplier.id"))
+    note: Mapped[str | None] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _created()
+
+
+class ProdFabricMove(Base):
+    """Kilos into or out of a fabric's storage, signed, to three decimals.
+    Never edited: a ``use`` is undone by a ``return`` that points at it (once),
+    a ``purchase`` by a ``void``. No money."""
+
+    __tablename__ = "prod_fabric_move"
+    __table_args__ = (
+        CheckConstraint(f"kind IN ({_in(FABRIC_MOVE_KINDS)})", name="prod_fabric_move_kind_valid"),
+        CheckConstraint("kg <> 0", name="prod_fabric_move_kg_not_zero"),
+        CheckConstraint(
+            "kind NOT IN ('purchase', 'void') OR purchase_id IS NOT NULL", name="prod_fabric_move_purchase_has_purchase"
+        ),
+        CheckConstraint("kind NOT IN ('use', 'return') OR order_id IS NOT NULL", name="prod_fabric_move_use_has_order"),
+        CheckConstraint("(kind = 'return') = (returns_id IS NOT NULL)", name="prod_fabric_move_return_shape"),
+        CheckConstraint(
+            "(kind IN ('purchase', 'return') AND kg > 0) OR (kind IN ('use', 'void') AND kg < 0) OR kind = 'count'",
+            name="prod_fabric_move_sign",
+        ),
+        Index("ix_prod_fabric_move_fabric", "fabric_id"),
+        Index("ix_prod_fabric_move_order", "order_id"),
+        Index("ix_prod_fabric_move_purchase", "purchase_id"),
+        Index(
+            "uq_prod_fabric_move_returns", "returns_id", unique=True, postgresql_where=text("returns_id IS NOT NULL")
+        ),
+        # A purchase fills storage once and is voided out of it once.
+        Index(
+            "uq_prod_fabric_move_purchase_kind",
+            "purchase_id",
+            "kind",
+            unique=True,
+            postgresql_where=text("purchase_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fabric_id: Mapped[int] = mapped_column(Integer, ForeignKey("prod_fabric.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    kg: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    purchase_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("prod_purchase.id"))
+    order_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("prod_order.id"))
+    returns_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("prod_fabric_move.id"))
+    note: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()

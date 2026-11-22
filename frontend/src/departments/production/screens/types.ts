@@ -241,6 +241,10 @@ export type OrderView = OrderRow & {
   fabric_bought_by: FabricBuyer;
   printing: Printing;
   print_supplier: { id: string; name: string | null } | null;
+  /** Fabric this order took from storage (ADR 0089); live uses only. */
+  fabric_uses?: FabricUse[];
+  /** What that fabric cost, for `production.owner` only; `null` when none is taken or a fabric has no price. */
+  fabric_cost?: FabricCost | null;
   repeat_run: boolean;
   notes: string | null;
   created_at: string | null;
@@ -299,6 +303,8 @@ export type Choices = {
   products: ChoiceProduct[];
   sizes: Size[];
   stage_days: Record<string, number>;
+  /** Active fabrics in storage, for taking fabric on the New order form (ADR 0089). */
+  fabrics?: ChoiceFabric[];
 };
 
 // ── Tasks (`app/modules/production/orders/services/tasks.py`) ────────────────
@@ -769,4 +775,81 @@ export type LibraryItem = {
   orders: { id: number; code: string; colour: string; status: OrderStatus; planned_total: number; target_date: string }[];
   updated_at: string | null;
   updated_by: string | null;
+};
+
+// ── Fabric storage (`/api/prod/fabrics`, ADR 0089) ───────────────────────────
+
+/** Kilos as the server writes them: "12.500". */
+export type Kg = string;
+
+export type ChoiceFabric = { id: number; name: string; colour: string | null; in_stock_kg: Kg };
+
+export type FabricUse = { move_id: number; fabric: { id: number; name: string; colour: string | null }; kg: Kg };
+
+export type FabricCost = { total_piastres: number; per_piece_piastres: number | null; pieces: number; basis: "cut" | "planned" };
+
+export type FabricRow = {
+  id: number;
+  name: string;
+  fabric_type: string | null;
+  colour: string | null;
+  colour_code: string | null;
+  supplier: { id: string; name: string } | null;
+  active: boolean;
+  in_stock_kg: Kg;
+  bought_kg: Kg;
+  used_kg: Kg;
+  /** Open orders holding fabric of it. */
+  orders: number;
+  /** `production.owner` only: the average of its live purchases. */
+  price_per_kg_piastres?: number | null;
+};
+
+export type FabricMoveKind = "purchase" | "use" | "return" | "count" | "void";
+
+export type FabricMove = {
+  id: number;
+  kind: FabricMoveKind;
+  /** Signed: in is positive, out is negative. */
+  kg: Kg;
+  created_at: string | null;
+  by: string | null;
+  note: string | null;
+  purchase: { id: number; item: string; supplier: { id: string; name: string } } | null;
+  order: { id: number; code: string } | null;
+  returned: boolean;
+};
+
+export type FabricDetail = { fabric: FabricRow & { note: string | null }; moves: FabricMove[] };
+
+// ── Billing (`/api/prod/billing`, ADR 0089), owner only ──────────────────────
+
+export type BillPhoto = { id: number; mime_type: string; url: string };
+
+export type Bill = {
+  id: number;
+  supplier: { id: string; name: string };
+  item: string;
+  quantity: string;
+  unit: PurchaseUnit;
+  unit_price_piastres: number;
+  total_piastres: number;
+  part: PurchasePart;
+  bought_on: string | null;
+  expected_on: string | null;
+  received_on: string | null;
+  order: { id: number; code: string } | null;
+  note: string | null;
+  voided: boolean;
+  void_reason: string | null;
+  fabric: { id: number; name: string } | null;
+  photos: BillPhoto[];
+  created_by: string | null;
+};
+
+export type BillingList = {
+  bills: Bill[];
+  total_piastres: number;
+  by_part: Record<PurchasePart, number>;
+  suppliers: { id: string; name: string }[];
 };

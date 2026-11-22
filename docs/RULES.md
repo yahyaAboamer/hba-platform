@@ -35,7 +35,7 @@ in place, and so is the sentence here that it replaced.
 | **Affiliate portal** (`.affiliate`) | Models on phones | Dark by default, denser, phone-shaped |
 | **Operations** (ADR 0057, levels ADR 0079) | Its viewers, staff and one manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/operations-dashboard-2026-10-03.html`), because no approved export draws it. Same tokens and palette as the maintainer's tool. |
 | **Inbox** (ADR 0059, being built) | Customer service, the operations manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/whatsapp-inbox-2026-10-11.html`). Same tokens and palette. |
-| **Production** (ADR 0084, 0085) | The QC manager, the owner, and the main factory through its own login | Platform screens with HBA's tokens, around the production order, at `/production`, with its own sidebar sections (Overview, Orders, Tasks, Incoming, Suppliers, Stage days). The framed app and its records were removed (ADR 0085: started from zero; the suppliers kept). |
+| **Production** (ADR 0084, 0085) | The QC manager, the owner, and the main factory through its own login | Platform screens with HBA's tokens, around the production order, at `/production`, with its own sidebar sections (Overview, Orders, Tasks, Library, Fabric, Incoming, Suppliers, Billing, Payments, Stage days; ADR 0087, 0089). The framed app and its records were removed (ADR 0085: started from zero; the suppliers kept). |
 
 **Decided, not built yet: one frame for every department (ADR 0068)**, from
 the owner-approved mockup `docs/design/hba-os-shell-2026-10-25.html`. One
@@ -342,6 +342,14 @@ payroll without touching a maintainer screen.
   `factory`, not staff) sees only its own orders and no money, ratings or
   other suppliers; its cut counts count only once the QC manager confirms
   them, since the factory is paid on pieces cut.
+- **Billing and fabric storage** (ADR 0089). A bill is a purchase on its
+  supplier's account, never a second record of the money; Billing, like
+  Payments, is `production.owner`'s. Fabric in storage is the sum of its
+  movements in kilos, never a stored figure; an order takes no more than
+  storage holds, a cancelled order gives back what it took, and a purchase
+  whose kilos are already used cannot be voided. The fabric cost from storage
+  is offered to the owner as the order's actual fabric cost, never written
+  without him.
 - **Three compensation types, not one.** `commission`,
   `fixed_plus_commission` (**both** are paid — the one most often got wrong),
   `base_guarantee` (`max(commission, base)`, only where targets were met). No

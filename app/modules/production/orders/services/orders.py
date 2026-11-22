@@ -459,7 +459,16 @@ def choices(db: Session) -> dict:
         ],
         "sizes": list(SIZES),
         "stage_days": stage_days(db),
+        # The fabric in storage a New order may take (ADR 0089). No money.
+        "fabrics": _storage().choices(db),
     }
+
+
+def _storage():
+    """Fabric storage (ADR 0089), which imports this module."""
+    from app.modules.production.orders.services import fabric
+
+    return fabric
 
 
 def _supplier(db: Session, supplier_id: str | None, what: str, keep: str | None = None) -> ProductionSupplier:
@@ -638,6 +647,8 @@ def create(db: Session, data: dict, actor: UserAccount) -> ProdOrder:
         db, order, actor, "created",
         f"Created {order.code}: {style} · {colour}, {_plural(total, 'piece')}, target {_said(target)}",
     )
+    # The fabric it takes from storage, in this same transaction (ADR 0089).
+    _storage().take_for_new_order(db, order, data.get("fabric") or [], actor)
     return order
 
 
@@ -692,6 +703,10 @@ def edit(db: Session, order_id: int, data: dict, actor: UserAccount) -> ProdOrde
     if "fabric_bought_by" in data and data["fabric_bought_by"] is not None:
         if cut and data["fabric_bought_by"] != order.fabric_bought_by:
             raise Locked("Who buys the fabric cannot change after cutting. Reopen cutting first.")
+        if data["fabric_bought_by"] == "factory" and _storage().holds_fabric(db, order.id):
+            raise Refused(
+                f"{order.code} took fabric from storage. Give it back before saying the factory buys the fabric."
+            )
         put(
             "fabric_bought_by", data["fabric_bought_by"],
             lambda old, new: f"from {_FABRIC_WORDS[old]} to {_FABRIC_WORDS[new]}",
@@ -1412,6 +1427,8 @@ def cancel(db: Session, order_id: int, reason: str, actor: UserAccount) -> ProdO
     order.notes = (f"{order.notes}\n" if order.notes else "") + f"Cancelled: {reason}"
     _touch(order)
     _audit(db, order, actor, "cancelled", f"Cancelled {order.code}: {reason}")
+    # Everything it took from fabric storage goes back (ADR 0089).
+    _storage().return_all(db, order, actor)
     return order
 
 
@@ -2015,11 +2032,19 @@ def view(db: Session, order_id: int, *, with_money: bool) -> dict:
         if facts.stages["cutting"].status == "todo"
         else None,
     }
+    # The fabric it took from storage, for everybody; what that cost, for the
+    # owner only, over the pieces cut once cutting is done, else those planned.
+    cut_done = facts.done("cutting")
+    body.update(
+        _storage().order_fabric(
+            db, order, facts.total("cut") if cut_done else facts.total("planned"),
+            "cut" if cut_done else "planned", with_money=with_money,
+        )
+    )
     if with_money:
         body["cost"] = cost(order)
         # What the purchases tied to this order say each part costs per piece:
         # over the pieces cut once cutting is done, else over those planned.
-        cut_done = facts.done("cutting")
         body["cost"]["from_purchases"] = account.from_purchases(
             db, order.id, facts.total("cut") if cut_done else facts.total("planned"),
             "cut" if cut_done else "planned",

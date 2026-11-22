@@ -3,6 +3,9 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { api, can } from "../../../lib/api";
 import type { Session } from "../../../lib/api";
+import { FabricLines, fabricLinesProblem } from "./FabricLines";
+import type { FabricLine } from "./FabricLines";
+import { kgOf } from "./fabricLogic";
 import { cogsText, hasCogs } from "./libraryLogic";
 import { COST_PARTS, DATED_STAGES, DATE_LABELS, fillDates, isBlank } from "./logic";
 import { cairoToday } from "./format";
@@ -28,6 +31,8 @@ export function NewOrder({ session }: { session: Session }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [params] = useSearchParams();
+  // Fabric taken from storage as the order is made (ADR 0089), when HBA buys its fabric.
+  const [fabricLines, setFabricLines] = useState<FabricLine[]>([]);
   // Whether the target cost was filled from the Library's COGS (ADR 0087), for the line that says so.
   const [costFromLibrary, setCostFromLibrary] = useState(false);
 
@@ -92,7 +97,7 @@ export function NewOrder({ session }: { session: Session }) {
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
-    const problem = draftProblem(draft, true);
+    const problem = draftProblem(draft, true) ?? (draft.fabricBy === "hba" ? fabricLinesProblem(fabricLines, choices?.fabrics ?? []) : null);
     if (problem) {
       setError(problem);
       return;
@@ -102,7 +107,16 @@ export function NewOrder({ session }: { session: Session }) {
     setError(null);
     setBusy(true);
     try {
-      const made = await api.post<OrderAnswer>("/api/prod/orders", { ...draftBody(draft), repeat_run: repeat, expected_dates: expected });
+      const fabric =
+        draft.fabricBy === "hba" && fabricLines.length > 0
+          ? fabricLines.map((line) => ({ fabric_id: Number(line.fabricId), kg: kgOf(line.kg) }))
+          : undefined;
+      const made = await api.post<OrderAnswer>("/api/prod/orders", {
+        ...draftBody(draft),
+        repeat_run: repeat,
+        expected_dates: expected,
+        ...(fabric ? { fabric } : {}),
+      });
       navigate(`/production/orders/${made.order.id}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The order could not be saved.");
@@ -125,6 +139,9 @@ export function NewOrder({ session }: { session: Session }) {
         <div className="prod-block">
           <form className="prod-form" onSubmit={create} noValidate>
             <OrderFields draft={draft} onChange={setDraft} choices={choices} />
+            {draft.fabricBy === "hba" && choices.fabrics && (
+              <FabricLines lines={fabricLines} fabrics={choices.fabrics} onChange={setFabricLines} />
+            )}
             {costFromLibrary && (
               <p className="prod-small prod-wide" role="status">
                 The target cost per piece is filled from this product&apos;s COGS in the Library. Change it if this run costs differently.

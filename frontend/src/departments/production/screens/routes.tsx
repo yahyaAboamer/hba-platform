@@ -5,6 +5,9 @@ import type { Session } from "../../../lib/api";
 import { IncomingScreen } from "./IncomingScreen";
 import { LibraryList } from "./LibraryList";
 import { LibraryPage } from "./LibraryPage";
+import { BillingScreen } from "./BillingScreen";
+import { FabricList } from "./FabricList";
+import { FabricPage } from "./FabricPage";
 import { NewOrder } from "./NewOrder";
 import { OrderList } from "./OrderList";
 import { OrderPage } from "./OrderPage";
@@ -81,6 +84,9 @@ export function productionRoutes(session: Session) {
         <Route path="tasks" element={<TaskScreen session={session} />} />
         <Route path="library" element={<LibraryList session={session} />} />
         <Route path="library/:id" element={<LibraryPage session={session} />} />
+        <Route path="fabric" element={<FabricList session={session} />} />
+        <Route path="fabric/:id" element={<FabricPage session={session} />} />
+        <Route path="billing" element={<BillingScreen session={session} />} />
         <Route path="incoming" element={<IncomingScreen session={session} />} />
         <Route path="suppliers" element={<SupplierScreen session={session} />} />
         <Route path="suppliers/:id" element={<SupplierPage session={session} />} />

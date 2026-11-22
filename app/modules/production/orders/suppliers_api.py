@@ -136,6 +136,18 @@ class SupplierEdit(BaseModel):
     section_ids: list[int] | None = Field(default=None, max_length=60)
 
 
+class NewFabricForPurchase(BaseModel):
+    """A fabric made by the purchase that fills it (ADR 0089); it takes the
+    purchase's supplier as its own."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(max_length=400)
+    fabric_type: str | None = Field(default=None, max_length=800)
+    colour: str | None = Field(default=None, max_length=200)
+    colour_code: str | None = Field(default=None, max_length=400)
+
+
 class NewPurchase(BaseModel):
     item: str = Field(max_length=400)
     quantity: Decimal = Field(gt=0, le=suppliers.MAX_QUANTITY, allow_inf_nan=False)
@@ -150,6 +162,10 @@ class NewPurchase(BaseModel):
     #: Paid now, 0 < deposit <= total; its method is then required.
     deposit_piastres: int | None = Field(default=None, ge=0, le=suppliers.MAX_LINE_PIASTRES)
     deposit_method: Method | None = None
+    #: Fabric bought by the kilo may fill storage (ADR 0089): an existing
+    #: fabric, or a new one; not both. Refused for any other part or unit.
+    fabric_id: int | None = Field(default=None, ge=1, le=2_147_483_647)
+    new_fabric: NewFabricForPurchase | None = None
 
 
 class PurchaseEdit(BaseModel):

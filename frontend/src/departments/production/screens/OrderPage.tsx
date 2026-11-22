@@ -8,6 +8,7 @@ import { cairoToday, pieces, plural, shortDay, stagePhrase, whoWhen } from "./fo
 import { BUYER_WORDS, nextButton, panelFromOpen, panelKey } from "./logic";
 import type { Panel, Powers } from "./logic";
 import { CostCard, DatesCard, DeliveriesCard, FilesCard, HistoryCard, OwedCard, OwnerCard, ProductCard, SizesCard, StagesCard } from "./OrderCards";
+import { FabricCard } from "./FabricCard";
 import { ActualCostForm, CancelForm, DateChangeForm, EditForm, ProductForm, ReopenForm, SampleForm, SettleForm, WriteOffForm } from "./OtherForms";
 import { RatePanel, RatingsCard } from "./RatingForms";
 import { CompleteForm, CutForm, FabricForm, InspectionForm } from "./StageForms";
@@ -358,6 +359,7 @@ export function OrderPage({ session }: { session: Session }) {
         <StagesCard order={order} powers={powers} open={open} run={run} />
         <div className="prod-stack">
           <ProductCard order={order} powers={powers} open={open} run={run} />
+          <FabricCard order={order} powers={powers} run={run} />
           <SizesCard order={order} powers={powers} open={open} />
           <DatesCard order={order} powers={powers} open={open} />
           <DeliveriesCard order={order} powers={powers} open={open} />
