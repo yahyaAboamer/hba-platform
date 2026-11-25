@@ -598,6 +598,31 @@ def undo_paid(db: Session, refund_id: int, reason: str, actor: UserAccount) -> O
     return row
 
 
+def set_order_number(db: Session, refund_id: int, raw, actor: UserAccount) -> OpsRefund:
+    """Type the Shopify order number Khazenly did not give, so the refund's
+    E-stebdal request can be found (ADR 0090). Allowed on a paid row too,
+    and only while the row has none: a number Khazenly gave is never
+    replaced by hand."""
+    row = _get(db, refund_id)
+    if row.order_number:
+        raise Refused("This refund already has its Shopify order number.")
+    number = tracking.shopify_number(str(raw or ""))
+    if number is None or not re.fullmatch(r"\s*#?\s*\d{3,10}\s*", str(raw or "")):
+        raise Refused("Type the Shopify order number, for example #32546.")
+    row.order_number = number
+    if row.estebdal_state != "done":
+        # Looked up again on the next run, as if never tried.
+        row.estebdal_state = None
+        row.estebdal_note = None
+        row.estebdal_choices = []
+        row.estebdal_tried_at = None
+    row.updated_by = actor.id
+    row.updated_at = utcnow()
+    db.flush()
+    _audit(db, "order_ops.refund_order_number_added", row, actor, order=number)
+    return row
+
+
 def delete(db: Session, refund_id: int, actor: UserAccount) -> None:
     row = _get(db, refund_id)
     if row.paid_on is not None:

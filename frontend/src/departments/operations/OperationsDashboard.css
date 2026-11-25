@@ -211,6 +211,8 @@
 .ops-rt__fold:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
 .ops-rt__undo .field { max-width:420px; }
 .ops-rt__estebdal { display:grid; gap:8px; }
+.ops-rt__order { display:grid; gap:8px; }
+.ops-rt__order .field { max-width:260px; }
 .ops-rt__estebdal > p { margin:0; }
 .ops-rt__form legend, .ops-rt__edit legend { padding:0; }
 

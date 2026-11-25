@@ -385,3 +385,54 @@ def test_each_row_of_the_run_is_committed_on_its_own(fresh_database, monkeypatch
         assert check.get(OpsRefund, first).estebdal_state == "done"
         assert check.get(OpsRefund, second).estebdal_state is None
         assert check.scalar(select(AuditEvent).where(AuditEvent.action == "order_ops.refund_estebdal_received")) is not None
+
+
+# ── Typing a missing Shopify order number ─────────────────────────────────────
+
+
+def test_a_missing_order_number_can_be_typed_on_a_paid_row_and_is_looked_up_again(db, auto):
+    row = _refund(db, order=None)
+    actor = _actor(db)
+    fake = FakeEstebdal({"#32546": [_req("r1", "#32546-R1")]})
+    estebdal_received.send(db, row, fake)
+    assert row.estebdal_state == "missing"
+
+    returns.set_order_number(db, row.id, " 32546 ", actor)
+    assert row.order_number == "#32546"
+    assert row.estebdal_state is None and row.estebdal_tried_at is None
+    assert estebdal_received.send_due(db, fake, transaction=_same) == 1
+    assert row.estebdal_state == "done" and fake.marked == [("r1", True)]
+
+    db.flush()
+    event = db.scalar(select(AuditEvent).where(AuditEvent.action == "order_ops.refund_order_number_added"))
+    assert event.after_json == {"number": "KH-HBA-09254008", "amount": "395.00", "order": "#32546"}
+    assert sentence(event, _Names(db, [event])) == "Added the Shopify order #32546 to the refund KH-HBA-09254008"
+
+
+@pytest.mark.parametrize("raw", ["", "abc", "#12", "32546-RE", "#32546 #32547"])
+def test_a_typed_order_number_must_be_a_shopify_number(db, raw):
+    row = _refund(db, order=None)
+    with pytest.raises(returns.Refused, match="for example #32546"):
+        returns.set_order_number(db, row.id, raw, _actor(db))
+    assert row.order_number is None
+
+
+def test_an_order_number_khazenly_gave_is_never_replaced(db):
+    row = _refund(db)
+    with pytest.raises(returns.Refused, match="already has"):
+        returns.set_order_number(db, row.id, "#11111", _actor(db))
+    assert row.order_number == "#32546"
+
+
+def test_typing_the_order_number_over_http_is_for_staff_only(client):
+    with SessionLocal() as setup:
+        refund_id = _refund(setup, order=None).id
+        setup.commit()
+    _become("operations_viewer")
+    assert client.post(f"/api/order-ops/returns/{refund_id}/order-number", json={"order_number": "#32546"}).status_code == 403
+    _become("operations_staff")
+    bad = client.post(f"/api/order-ops/returns/{refund_id}/order-number", json={"order_number": "abc"})
+    assert bad.status_code == 422 and "for example #32546" in bad.json()["detail"]
+    added = client.post(f"/api/order-ops/returns/{refund_id}/order-number", json={"order_number": "#32546"})
+    assert added.status_code == 200, added.text
+    assert added.json()["refund"]["order_number"] == "#32546"
