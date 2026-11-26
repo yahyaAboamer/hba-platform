@@ -44,6 +44,12 @@ function newestFromHer(messages: ChatMessage[]): number {
   );
 }
 
+/** The words a searched list opened this chat with, if any. */
+function foundWords(state: unknown): string {
+  const find = (state as { find?: unknown } | null)?.find;
+  return typeof find === "string" ? find.trim() : "";
+}
+
 /** "can reply freely until 14:21 tomorrow", or why not. */
 function windowWords(closesAt: string | null, open: boolean, now: number): string {
   if (!closesAt) return "has not written yet";
@@ -78,10 +84,14 @@ export function ChatPane({
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [announced, setAnnounced] = useState("");
+  // Opened from a list searched for words said in this chat, it opens
+  // searched for them, on the newest message that holds them.
+  const { search, state } = useLocation();
+  const [arrivedFor] = useState(() => foundWords(state));
   // Searching inside the chat: what is typed, what the server found for it
   // (newest first), and which of those is on screen.
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(arrivedFor !== "");
+  const [query, setQuery] = useState(arrivedFor);
   const [found, setFound] = useState<SearchFound | null>(null);
   const [foundFor, setFoundFor] = useState("");
   const [onMatch, setOnMatch] = useState(0);
@@ -89,7 +99,6 @@ export function ChatPane({
   const now = useNow();
   const narrow = useIsNarrow();
   // The way back keeps the list as it was (its view is in the address).
-  const { search } = useLocation();
 
   const held = useRef<ChatMessage[]>([]);
   const heardFromHer = useRef<number | null>(null);
@@ -223,9 +232,11 @@ export function ChatPane({
   }, [conversationId, earlier, readingEarlier]);
 
   // Asked of the server, not of what is on screen: a match pages above what
-  // is loaded is still found, and then loaded to be shown.
+  // is loaded is still found, and then loaded to be shown. Not before the
+  // newest page is in, so a chat opened searched pages back from there.
+  const loaded = messages !== null;
   useEffect(() => {
-    if (!searchOpen) return;
+    if (!searchOpen || !loaded) return;
     const words = query.trim();
     if (words.length < 2) {
       setFound(null);
@@ -258,7 +269,7 @@ export function ChatPane({
       window.clearTimeout(timer);
     };
     // showMatch reads only refs and stable setters.
-  }, [conversationId, query, searchOpen]);
+  }, [conversationId, query, searchOpen, loaded]);
 
   /** Read earlier pages until the message is loaded, then bring it into view. */
   async function showMatch(id: number) {

@@ -68,6 +68,7 @@
 .inbox-chat__last { display:flex; align-items:center; gap:5px; min-width:0; font-size:12.5px; color:var(--quiet); }
 .inbox-chat__last svg { width:13px; height:13px; flex:none; }
 .inbox-chat__words { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.inbox-chat__last--found mark { padding:0 1px; border-radius:2px; background:var(--owed-quiet); color:var(--ink); font-weight:600; }
 .inbox-chat__badge { justify-self:end; min-width:20px; padding:1px 6px; border-radius:999px; background:var(--accent-fill); color:var(--accent-on); font-size:11.5px; text-align:center; }
 .inbox-chat--unread .inbox-chat__name, .inbox-chat--unread .inbox-chat__last { color:var(--ink); font-weight:500; }
 .inbox-chat--unread .inbox-chat__fb { font-weight:400; }

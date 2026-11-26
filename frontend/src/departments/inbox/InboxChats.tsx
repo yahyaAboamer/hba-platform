@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 
 import { ChatPane } from "./ChatPane";
+import { Marked } from "./ChatMessages";
 import { InboxIcon } from "./InboxIcon";
 import type { InboxIconName } from "./InboxIcon";
 import { useInbox } from "./useInbox";
@@ -234,20 +235,28 @@ function ChatRow({
   open,
   now,
   search,
+  q,
 }: {
   chat: Conversation;
   open: boolean;
   now: number;
   /** The list's own address query (`?view=follow_up`), kept so opening a chat does not change the list. */
   search: string;
+  /** What the list is searched for. */
+  q: string;
 }) {
   const name = chatName(chat);
   const last = lastLine(chat);
   const unread = chat.unread_count > 0;
+  // Found by words said in it: the message that holds them, as WhatsApp
+  // shows it, and the chat opens searched for them, on that message.
+  const found = q ? chat.found : null;
+  const at = found ? found.at : chat.last_message_at;
   return (
     <li>
       <Link
         to={{ pathname: `/inbox/chats/${chat.id}`, search }}
+        state={found ? { find: q } : undefined}
         className={unread ? "inbox-chat inbox-chat--unread" : "inbox-chat"}
         aria-current={open ? "true" : undefined}
       >
@@ -262,14 +271,24 @@ function ChatRow({
             </span>
           )}
         </span>
-        <span className="inbox-chat__time">
-          {chat.last_message_at ? listTime(chat.last_message_at, now) : ""}
-        </span>
-        <span className="inbox-chat__last">
-          {last.icon && <InboxIcon name={last.icon} />}
-          {last.ours && <span className="visually-hidden">Sent: </span>}
-          <span className="inbox-chat__words">{last.words}</span>
-        </span>
+        <span className="inbox-chat__time">{at ? listTime(at, now) : ""}</span>
+        {found ? (
+          <span className="inbox-chat__last inbox-chat__last--found">
+            {found.direction === "out" && <InboxIcon name="tick" />}
+            <span className="visually-hidden">
+              {found.direction === "out" ? "Found in a message sent: " : "Found in her message: "}
+            </span>
+            <span className="inbox-chat__words">
+              <Marked text={found.snippet} words={q} />
+            </span>
+          </span>
+        ) : (
+          <span className="inbox-chat__last">
+            {last.icon && <InboxIcon name={last.icon} />}
+            {last.ours && <span className="visually-hidden">Sent: </span>}
+            <span className="inbox-chat__words">{last.words}</span>
+          </span>
+        )}
         {unread ? (
           <span className="inbox-chat__badge">
             {chat.unread_count}
@@ -346,11 +365,11 @@ export function InboxChats() {
         </div>
 
         <label className="inbox-search">
-          <span className="visually-hidden">Search chats</span>
+          <span className="visually-hidden">Search chats and messages</span>
           <InboxIcon name="search" />
           <input
             type="search"
-            placeholder="Name, phone or order number"
+            placeholder="Name, phone, order or words in a chat"
             value={typed}
             maxLength={120}
             onChange={(event) => setTyped(event.target.value)}
@@ -393,7 +412,7 @@ export function InboxChats() {
               <span>
                 No chat matches “{q}”.
                 <br />
-                Check the number, or search by phone.
+                Check the spelling or the number, or try fewer words.
               </span>
             ) : (
               <span>{EMPTY[view]}</span>
@@ -404,7 +423,14 @@ export function InboxChats() {
         {chats !== null && chats.length > 0 && (
           <ul className="inbox-chats">
             {chats.map((chat) => (
-              <ChatRow key={chat.id} chat={chat} open={chat.id === openId} now={now} search={search} />
+              <ChatRow
+                key={chat.id}
+                chat={chat}
+                open={chat.id === openId}
+                now={now}
+                search={search}
+                q={q}
+              />
             ))}
             {more && (
               <li className="inbox-chats__more" ref={end}>

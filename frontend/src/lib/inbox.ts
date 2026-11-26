@@ -96,6 +96,20 @@ export type Conversation = {
    * A marker only - the chat's own `feedback` is an object (`ChatFeedback`).
    */
   feedback?: FeedbackMarker | null;
+  /**
+   * When the list is searched and this chat was found by words said in it
+   * (not by her name, phone or order): its newest message that holds them.
+   * The row shows it in place of the last message, and the chat opens on it.
+   */
+  found?: FoundMessage | null;
+};
+
+export type FoundMessage = {
+  id: number;
+  direction: "in" | "out";
+  at: string | null;
+  /** The part of the message around the words, on one line. */
+  snippet: string;
 };
 
 export type FeedbackMarker = "reopened" | "follow_up" | "neutral";

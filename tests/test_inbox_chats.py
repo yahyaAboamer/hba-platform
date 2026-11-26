@@ -115,7 +115,7 @@ def test_the_list_is_newest_first_with_what_the_row_shows(db):
         "last_message_at": newest.last_message_at.isoformat(), "last_preview": "Voice note",
         "last_direction": "in", "unread_count": 2, "window_open": True,
         "window_closes_at": (newest.last_inbound_at + timedelta(hours=24)).isoformat(),
-        "answer": None, "feedback": None,
+        "answer": None, "feedback": None, "found": None,
     }
 
 
@@ -191,6 +191,60 @@ def test_search_is_by_name_phone_or_order_number(db, q, found):
     _chat(db, "201105550199", "Salma Hany", minutes_ago=2)
     _order(db, "5001", nour, order_name="#31044")
     assert [row["name"] for row in chats.list_conversations(db, q=q)["conversations"]] == found
+
+
+def test_the_list_search_finds_a_chat_by_the_words_inside_it(db):
+    nour = _chat(db, "201005550188", "Nour Adel", minutes_ago=1)
+    salma = _chat(db, "201105550199", "Salma Hany", minutes_ago=2)
+    _chat(db, "201205550111", "Hana Ali", minutes_ago=3)
+    _message(db, nour, "Is the BEIGE dress in stock?", minutes_ago=50)
+    newest = _message(db, nour, "I'll take the beige one in M", direction="out", minutes_ago=40)
+    _message(db, nour, "Thanks", minutes_ago=30)
+    receipt = _message(db, salma, None, kind="document", minutes_ago=20)
+    db.add(InboxMedia(message_id=receipt.id, mime_type="application/pdf", filename="beige-receipt.pdf",
+                      state="stored", storage_key="inbox/1/receipt.pdf"))
+    # A reaction's emoji is never a match.
+    _message(db, salma, "beige", kind="reaction", minutes_ago=10)
+    db.flush()
+
+    rows = chats.list_conversations(db, q="  Beige ")["conversations"]
+    assert [row["name"] for row in rows] == ["Nour Adel", "Salma Hany"]
+    assert rows[0]["found"] == {
+        "id": newest.id, "direction": "out", "at": newest.occurred_at.isoformat(),
+        "snippet": "I'll take the beige one in M",
+    }
+    assert rows[1]["found"]["id"] == receipt.id
+    assert rows[1]["found"]["snippet"] == "beige-receipt.pdf"
+
+
+def test_a_chat_found_by_her_name_shows_as_it_always_does(db):
+    nour = _chat(db, "201005550188", "Nour Adel", minutes_ago=1)
+    _message(db, nour, "My friend Nour told me about you", minutes_ago=5)
+    other = _chat(db, "201105550199", "Salma Hany", minutes_ago=2)
+    _message(db, other, "Nour sent me", minutes_ago=6)
+    rows = chats.list_conversations(db, q="nour")["conversations"]
+    assert [(row["name"], row["found"] is None) for row in rows] == [("Nour Adel", True), ("Salma Hany", False)]
+    # Without a search, no row carries a found message.
+    assert all(row["found"] is None for row in chats.list_conversations(db)["conversations"])
+
+
+def test_the_list_searches_messages_only_from_two_letters_and_as_letters(db):
+    nour = _chat(db, "201005550188", "Nour Adel", minutes_ago=1)
+    _message(db, nour, "100% cotton?", minutes_ago=5)
+    assert [row["name"] for row in chats.list_conversations(db, q="0%")["conversations"]] == ["Nour Adel"]
+    assert chats.list_conversations(db, q="%")["conversations"] == []
+    assert chats.list_conversations(db, q="c")["conversations"] == []
+    assert chats.list_conversations(db, q="_o")["conversations"] == []
+
+
+def test_a_found_message_shows_the_part_that_holds_the_words():
+    long = "Hello there, I wanted to ask about the order I placed last week because " \
+           "the linen shirt arrived in the wrong size and I need a large instead please thank you"
+    snippet = chats._snippet(long, "linen")
+    assert snippet.startswith("…") and "linen shirt" in snippet
+    assert snippet.index("linen") <= chats.SNIPPET_BEFORE + 2
+    assert snippet.endswith("…")
+    assert chats._snippet("Line one\nlinen  two", "linen") == "Line one linen two"
 
 
 def test_a_page_marker_that_is_not_ours_is_refused(db):
