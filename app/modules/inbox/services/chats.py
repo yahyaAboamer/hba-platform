@@ -117,7 +117,12 @@ _sorted_at = func.coalesce(InboxConversation.last_message_at, EPOCH)
 # ── The list ──────────────────────────────────────────────────────────────────
 
 
-def _search(q: str):
+#: The fewest letters searched for inside messages: one letter is in nearly
+#: every message, and would hold every chat.
+MESSAGE_SEARCH_MIN = 2
+
+
+def _identity(q: str):
     """Name, phone or order number."""
     digits = re.sub(r"\D", "", q)
     clauses = [InboxConversation.name.ilike(_like(q), escape="\\")]
@@ -140,6 +145,88 @@ def _search(q: str):
             .exists()
         )
     return or_(*clauses)
+
+
+def _message_matches(q: str):
+    """Her messages, or ours, whose words or file's name hold ``q``. Read as
+    the chat's own search reads them (``search_messages``): a reaction is one
+    emoji sitting on another message, and is not searched."""
+    pattern = _like(q)
+    return and_(
+        InboxMessage.kind != "reaction",
+        or_(
+            InboxMessage.body.ilike(pattern, escape="\\"),
+            select(InboxMedia.id)
+            .where(
+                InboxMedia.message_id == InboxMessage.id,
+                InboxMedia.filename.ilike(pattern, escape="\\"),
+            )
+            .correlate(InboxMessage)
+            .exists(),
+        ),
+    )
+
+
+def _search(q: str):
+    """Name, phone, order number, or words inside the chat (as WhatsApp's own
+    search finds a chat by what was said in it)."""
+    if len(q) < MESSAGE_SEARCH_MIN:
+        return _identity(q)
+    return or_(
+        _identity(q),
+        select(InboxMessage.id)
+        .where(InboxMessage.conversation_id == InboxConversation.id, _message_matches(q))
+        .exists(),
+    )
+
+
+#: How much of a found message the list shows, and how much before the words.
+SNIPPET = 90
+SNIPPET_BEFORE = 24
+
+
+def _snippet(text: str, q: str) -> str:
+    """The part of ``text`` around the first place it holds ``q``, so the words
+    found are in view on one line of the list."""
+    text = " ".join(text.split())
+    at = text.lower().find(q.lower())
+    if at <= SNIPPET_BEFORE:
+        start = 0
+    else:
+        # Start at a word, not in the middle of one.
+        space = text.find(" ", at - SNIPPET_BEFORE, at)
+        start = space + 1 if space != -1 else at - SNIPPET_BEFORE
+    piece = text[start : start + SNIPPET]
+    return ("…" if start else "") + piece + ("…" if start + SNIPPET < len(text) else "")
+
+
+def _found_messages(db: Session, conversation_ids: list[int], q: str) -> dict[int, dict]:
+    """For each chat, its newest message that holds ``q``: what the list shows
+    in place of the last message, and where the chat opens."""
+    if not conversation_ids:
+        return {}
+    rows = db.execute(
+        select(InboxMessage, InboxMedia.filename)
+        .outerjoin(InboxMedia, InboxMedia.message_id == InboxMessage.id)
+        .where(InboxMessage.conversation_id.in_(conversation_ids), _message_matches(q))
+        .order_by(
+            InboxMessage.conversation_id,
+            InboxMessage.occurred_at.desc(),
+            InboxMessage.id.desc(),
+        )
+        .distinct(InboxMessage.conversation_id)
+    ).all()
+    found = {}
+    for message, filename in rows:
+        body = message.body or ""
+        text = body if q.lower() in body.lower() else (filename or body)
+        found[message.conversation_id] = {
+            "id": message.id,
+            "direction": message.direction,
+            "at": _iso(message.occurred_at),
+            "snippet": _snippet(text, q),
+        }
+    return found
 
 
 def describe_conversation(conversation: InboxConversation, answer: str | None) -> dict:
@@ -183,8 +270,9 @@ def list_conversations(
         query = query.where(feedback.follow_up_clause(include_tests=True))
     elif view == "neutral":
         query = query.where(feedback.neutral_clause())
-    if q and q.strip():
-        query = query.where(_search(q.strip()[:120]))
+    q = (q or "").strip()[:120]
+    if q:
+        query = query.where(_search(q))
     position = _read_cursor(before)
     if position:
         at, row_id = position
@@ -196,9 +284,25 @@ def list_conversations(
     ).all()
     page = rows[:limit]
     marked = feedback.markers(db, [row[0].id for row in page])
+    # A chat found by what was said in it shows that message, not its last.
+    # One found by her name, phone or order shows as it always does.
+    found: dict[int, dict] = {}
+    if len(q) >= MESSAGE_SEARCH_MIN and page:
+        by_identity = set(
+            db.scalars(
+                select(InboxConversation.id).where(
+                    InboxConversation.id.in_([row[0].id for row in page]), _identity(q)
+                )
+            )
+        )
+        found = _found_messages(db, [row[0].id for row in page if row[0].id not in by_identity], q)
     return {
         "conversations": [
-            {**describe_conversation(row[0], row[1]), "feedback": marked.get(row[0].id)}
+            {
+                **describe_conversation(row[0], row[1]),
+                "feedback": marked.get(row[0].id),
+                "found": found.get(row[0].id),
+            }
             for row in page
         ],
         "next": _cursor(page[-1][0].last_message_at, page[-1][0].id) if len(rows) > limit else None,

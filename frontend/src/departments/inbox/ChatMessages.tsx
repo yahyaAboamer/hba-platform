@@ -246,7 +246,7 @@ function whoSent(message: ChatMessage): string {
 }
 
 /** `text` with each place it holds `words` marked, ignoring case. */
-function Marked({ text, words }: { text: string; words?: string }) {
+export function Marked({ text, words }: { text: string; words?: string }) {
   const wanted = words?.trim().toLowerCase();
   const lower = text.toLowerCase();
   // A letter whose lower case is longer would put the marks in the wrong place.

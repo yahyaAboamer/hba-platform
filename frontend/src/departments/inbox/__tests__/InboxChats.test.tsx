@@ -217,13 +217,52 @@ describe("the list of chats", () => {
     show();
     await screen.findByRole("link", { name: /Nour Adel/ });
 
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search chats" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search chats and messages" }), {
       target: { value: "#99999" },
     });
 
     expect(await screen.findByText(/No chat matches “#99999”\./)).toBeTruthy();
-    expect(screen.getByText(/Check the number, or search by phone\./)).toBeTruthy();
+    expect(screen.getByText(/Check the spelling or the number, or try fewer words./)).toBeTruthy();
     expect(calls.some((call) => call.url === "/api/inbox/conversations?q=%2399999")).toBe(true);
+  });
+
+  it("finds a chat by words said in it, shows that message, and opens the chat on it", async () => {
+    serve({
+      list: (url) =>
+        url.includes("q=")
+          ? {
+              conversations: [
+                chat(12, {
+                  found: { id: 6, direction: "in", at: minutesAgo(30), snippet: "Is the Beige one in stock?" },
+                }),
+              ],
+              next: null,
+              counts: COUNTS,
+            }
+          : { conversations: [chat(12)], next: null, counts: COUNTS },
+      messages: [message(5, { body: "Thanks" }), message(6, { body: "Is the Beige one in stock?" })],
+      search: () => ({ matches: [{ id: 6 }], more: false }),
+    });
+    const { container } = show();
+    await screen.findByRole("link", { name: /Nour Adel/ });
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search chats and messages" }), {
+      target: { value: "beige" },
+    });
+
+    // The row shows the message that holds the words, marked, not the last one.
+    const row = await screen.findByRole("link", { name: /Found in her message/ });
+    expect(row.querySelector("mark")?.textContent).toBe("Beige");
+    expect(calls.some((call) => call.url === "/api/inbox/conversations?q=beige")).toBe(true);
+
+    // Opened from there, the chat is searched for the same words, on that message.
+    fireEvent.click(row);
+    const box = await screen.findByRole("searchbox", { name: "Search in this chat" });
+    expect((box as HTMLInputElement).value).toBe("beige");
+    expect(await screen.findByText("1 of 1")).toBeTruthy();
+    await waitFor(() =>
+      expect(container.querySelector('[data-message="6"]')?.className).toContain("inbox-msg--found"),
+    );
   });
 
   it("reaches every chat, a page at a time", async () => {
