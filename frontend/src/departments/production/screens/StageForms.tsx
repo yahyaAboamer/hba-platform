@@ -12,6 +12,7 @@ import { cairoToday, plural } from "./format";
 import {
   blankReason,
   countsFrom,
+  cutEditProblem,
   cutProblem,
   cutShortfall,
   inspectionProblem,
@@ -193,6 +194,88 @@ export function CutForm({ order, run, onClose }: FormProps) {
         <DateBox label="Date the factory now promises" value={promised} onChange={setPromised} hint="If it differs from the delivery date, the change is kept in the date history." />
         <DateBox label="Cut on" value={day} onChange={setDay} max={today} />
         <Actions error={error} busy={busy} label="Save cut quantities" working="Saving…" />
+      </form>
+    </PanelShell>
+  );
+}
+
+/**
+ * The owner corrects the cut once it is recorded, without reopening cutting or
+ * anything after it. The reason is kept in the history. The factory is paid on
+ * pieces cut, so what it is owed follows the new counts.
+ */
+export function CutEditForm({ order, run, onClose }: FormProps) {
+  const planned = order.totals.planned ?? 0;
+  const [cut, setCut] = useState<Counts>(() =>
+    countsFrom(Object.fromEntries(order.sizes.map((line) => [line.size, line.cut ?? 0]))),
+  );
+  const [reasons, setReasons] = useState<ReasonRow[]>(() =>
+    order.reasons.cut_short.length ? reasonsFrom(order.reasons.cut_short) : [blankReason()],
+  );
+  const [why, setWhy] = useState("");
+  const { error, busy, submit } = useSubmit(run);
+
+  const inspected = Object.fromEntries(
+    order.sizes.map((line) => [line.size, (line.passed ?? 0) + (line.to_fix ?? 0) + (line.rejected ?? 0)]),
+  ) as Partial<Record<Size, number>>;
+  const inspectionDone = order.stages.some((stage) => stage.key === "final_inspection" && stage.status === "done");
+  const shortfall = cutShortfall({ cut, planned });
+  const given = reasonTotal(reasons);
+  const hints = Object.fromEntries(
+    order.sizes.map((line) => [
+      line.size,
+      `planned ${line.planned}` + ((inspected[line.size] ?? 0) > 0 ? `, ${inspected[line.size]} inspected` : ""),
+    ]),
+  ) as Partial<Record<Size, string>>;
+  const has = (size: Size) => order.sizes.some((line) => line.size === size);
+
+  return (
+    <PanelShell
+      title="Edit cut counts"
+      intro="Correct the pieces cut in each size. Cutting stays done and nothing after it is reopened. The factory is paid on pieces cut, so what it is owed follows these numbers."
+      onClose={onClose}
+    >
+      <form
+        className="prod-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit(
+            cutEditProblem({ cut, planned, reasons, inspected, inspectionDone, why }),
+            () =>
+              api.patch<OrderAnswer>(`/api/prod/orders/${order.id}/cut`, {
+                sizes: sizesBody(cut, has),
+                reasons: shortfall > 0 ? reasonBody(reasons) : [],
+                reason: why.trim(),
+              }),
+            "Cut counts changed.",
+          );
+        }}
+      >
+        {inspectionDone && (
+          <p className="prod-flag prod-flag--owed prod-wide" role="status">
+            The final inspection is complete, so each size must stay equal to what was inspected. Reopen the final inspection to change the counts.
+          </p>
+        )}
+        <SizeInputs
+          legend="Pieces cut"
+          counts={cut}
+          onChange={(size, value) => setCut({ ...cut, [size]: value })}
+          hints={hints}
+          total={`Cut ${totalOf(cut).toLocaleString("en-GB")} of ${planned.toLocaleString("en-GB")} planned${
+            shortfall > 0 ? `: ${plural(shortfall, "piece")} fewer` : shortfall < 0 ? `: ${plural(-shortfall, "piece")} more` : ""
+          }`}
+        />
+        {shortfall > 0 && (
+          <ReasonRows
+            legend={`Why ${plural(shortfall, "piece")} fewer were cut`}
+            rows={reasons}
+            onChange={setReasons}
+            summary={`Reasons add up to ${given.toLocaleString("en-GB")} of ${shortfall.toLocaleString("en-GB")}`}
+            tone={given === shortfall ? "ok" : "late"}
+          />
+        )}
+        <TextBox label="Why the cut is changing" value={why} onChange={setWhy} wide max={500} />
+        <Actions error={error} busy={busy} label="Save cut counts" working="Saving…" />
       </form>
     </PanelShell>
   );

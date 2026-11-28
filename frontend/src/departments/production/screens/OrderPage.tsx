@@ -11,7 +11,7 @@ import { CostCard, DatesCard, DeliveriesCard, FilesCard, HistoryCard, OwedCard, 
 import { FabricCard } from "./FabricCard";
 import { ActualCostForm, CancelForm, DateChangeForm, EditForm, ProductForm, ReopenForm, SampleForm, SettleForm, WriteOffForm } from "./OtherForms";
 import { RatePanel, RatingsCard } from "./RatingForms";
-import { CompleteForm, CutForm, FabricForm, InspectionForm } from "./StageForms";
+import { CompleteForm, CutEditForm, CutForm, FabricForm, InspectionForm } from "./StageForms";
 import type { OrderAnswer, OrderRatings, OrderView } from "./types";
 import { Problem } from "./ui";
 import type { Run } from "./ui";
@@ -75,6 +75,8 @@ function PanelView({
       return <FabricForm {...common} />;
     case "cut":
       return <CutForm {...common} />;
+    case "cutEdit":
+      return <CutEditForm {...common} />;
     case "inspection":
       return <InspectionForm {...common} />;
     case "sample":
