@@ -343,6 +343,21 @@ def record_cut(
     return _write(db, actor, lambda: orders.record_cut(db, order_id, data, actor))
 
 
+class CutEdit(BaseModel):
+    sizes: dict[Size, int]
+    reasons: list[Reason] = Field(default_factory=list, max_length=50)
+    reason: str = Field(default="", max_length=1000)
+
+
+@router.patch("/orders/{order_id}/cut")
+def edit_cut(
+    order_id: int, body: CutEdit, actor: UserAccount = Depends(OWNER), db: Session = Depends(get_session)
+) -> dict:
+    """The owner corrects the cut counts after cutting is recorded."""
+    data = body.model_dump()
+    return _write(db, actor, lambda: orders.edit_cut(db, order_id, data, actor))
+
+
 @router.put("/orders/{order_id}/inspection")
 def save_inspection(
     order_id: int, body: Inspection, actor: UserAccount = Depends(EDIT), db: Session = Depends(get_session)

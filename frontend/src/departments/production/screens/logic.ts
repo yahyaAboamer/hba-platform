@@ -111,6 +111,34 @@ export function cutProblem(draft: CutDraft): string | null {
 
 const pieceCount = (count: number): string => count.toLocaleString("en-GB");
 
+/** The owner's correction of a recorded cut. */
+export type CutEditDraft = {
+  cut: Counts;
+  planned: number;
+  reasons: ReasonRow[];
+  /** Passed + to fix + rejected so far, per size. */
+  inspected: Partial<Record<Size, number>>;
+  /** Once the final inspection is complete, each size's cut must still equal what was inspected. */
+  inspectionDone: boolean;
+  why: string;
+};
+
+/** The first thing wrong with the owner's cut correction, or `null`. The server checks the same. */
+export function cutEditProblem(draft: CutEditDraft): string | null {
+  const counted = cutProblem({ cut: draft.cut, planned: draft.planned, reasons: draft.reasons, promised: "-", today: "" });
+  if (counted) return counted;
+  for (const size of SIZES) {
+    const inspected = draft.inspected[size] ?? 0;
+    const wanted = whole(draft.cut[size]);
+    if (inspected > wanted) return `Size ${size}: ${pieceCount(inspected)} pieces are already inspected, more than ${pieceCount(wanted)} cut.`;
+    if (draft.inspectionDone && wanted !== inspected) {
+      return `Size ${size}: the final inspection is complete with ${pieceCount(inspected)} inspected. Reopen the final inspection to change the cut.`;
+    }
+  }
+  if (isBlank(draft.why)) return "Say why the cut is changing.";
+  return null;
+}
+
 // ── Final inspection ─────────────────────────────────────────────────────────
 
 export type InspectionLine = { size: Size; cut: number; passed: string; to_fix: string; rejected: string };
@@ -332,6 +360,7 @@ export type Panel =
   | { kind: "complete"; stage: "materials" | "pattern_check" | "making" }
   | { kind: "fabric" }
   | { kind: "cut" }
+  | { kind: "cutEdit" }
   | { kind: "inspection" }
   | { kind: "sample" }
   | { kind: "delivery"; id: number | null; deliveryKind: DeliveryKind }

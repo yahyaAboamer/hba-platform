@@ -153,6 +153,9 @@ export function SizesCard({ order, powers, open }: CardProps) {
         {edit && cutDone && stageStatus(order, "final_inspection") === "todo" && (
           <button type="button" className="button button--row" onClick={() => open({ kind: "inspection" })}>Enter inspection counts</button>
         )}
+        {powers.isOwner && isOpen(order) && cutDone && (
+          <button type="button" className="button button--row" onClick={() => open({ kind: "cutEdit" })}>Edit cut counts</button>
+        )}
       </div>
       <div className="prod-scroll">
         <table className="table">

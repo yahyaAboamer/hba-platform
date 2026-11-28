@@ -347,6 +347,8 @@ payroll without touching a maintainer screen.
   `factory`, not staff) sees only its own orders and no money, ratings or
   other suppliers; its cut counts count only once the QC manager confirms
   them, since the factory is paid on pieces cut.
+  Once cutting is done only the owner corrects the cut counts, with a reason
+  kept in the history, never below what is inspected (ADR 0091).
 - **Billing and fabric storage** (ADR 0089). A bill is a purchase on its
   supplier's account, never a second record of the money; Billing, like
   Payments, is `production.owner`'s. Fabric in storage is the sum of its

@@ -777,6 +777,51 @@ def test_the_owner_reopens_only_the_latest_done_stage(owner, staff):
     assert again["totals"]["cut"] == 1000 and again["reasons"]["cut_short"] == []
 
 
+def test_the_owner_edits_the_cut_counts_without_reopening(owner, staff):
+    oid = _new(owner)["id"]
+    url = f"/api/prod/orders/{oid}/cut"
+    fixed = {**CUT, "M": 300}  # 980 cut, 20 short
+    reasons = [{"reason": "Fabric defects", "quantity": 20}]
+    _to_cutting(owner, oid)
+    assert owner.patch(url, json={"sizes": fixed, "reasons": reasons, "reason": "Recount"}).status_code == 422
+    _cut(owner, oid)
+    _ok(owner.post(f"/api/prod/orders/{oid}/stages/making/complete", json={}))
+    # Only the owner, with a reason, and a shortfall still needs reasons adding up.
+    assert staff.patch(url, json={"sizes": fixed, "reasons": reasons, "reason": "Recount"}).status_code == 403
+    assert owner.patch(url, json={"sizes": fixed, "reasons": reasons}).status_code == 422
+    assert owner.patch(url, json={"sizes": fixed, "reason": "Recount"}).status_code == 422
+    order = _ok(owner.patch(url, json={"sizes": fixed, "reasons": reasons, "reason": "Recounted the M"}))
+    assert order["totals"]["cut"] == 980
+    assert _stage(order, "cutting")["status"] == "done" and _stage(order, "making")["status"] == "done"
+    assert [(r["reason"], r["quantity"]) for r in order["reasons"]["cut_short"]] == [("Fabric defects", 20)]
+    assert order["delivery_date"] == TARGET.isoformat()
+    # Saving the same again changes nothing.
+    assert owner.patch(url, json={"sizes": fixed, "reasons": reasons, "reason": "Again"}).status_code == 422
+    events = owner.get(f"/api/prod/orders/{oid}/history").json()["events"]
+    edited = next(e for e in events if e["action"] == "production.order_cut_edited")
+    assert "M 292 → 300" in edited["summary"] and "Recounted the M" in edited["summary"]
+
+
+def test_an_edited_cut_never_falls_below_the_inspection(owner):
+    oid = _new(owner)["id"]
+    url = f"/api/prod/orders/{oid}/cut"
+    _to_cutting(owner, oid)
+    _cut(owner, oid)
+    _ok(owner.post(f"/api/prod/orders/{oid}/stages/making/complete", json={}))
+    _ok(owner.put(f"/api/prod/orders/{oid}/inspection", json={"sizes": {"S": {"passed": 140, "to_fix": 0, "rejected": 0}}}))
+    below = owner.patch(url, json={"sizes": {**CUT, "S": 139}, "reasons": [{"reason": "x", "quantity": 37}], "reason": "Recount"})
+    assert below.status_code == 422 and "140" in below.json()["detail"]
+    _inspected_order = _ok(
+        owner.put(
+            f"/api/prod/orders/{oid}/inspection",
+            json={"sizes": INSPECTED, "reasons": INSPECTION_REASONS, "complete": True},
+        )
+    )
+    assert _stage(_inspected_order, "final_inspection")["status"] == "done"
+    more = owner.patch(url, json={"sizes": {**CUT, "S": 150}, "reasons": [{"reason": "x", "quantity": 26}], "reason": "Recount"})
+    assert more.status_code == 422 and "Reopen the final inspection" in more.json()["detail"]
+
+
 def test_reopening_the_sample_asks_for_it_again(owner):
     oid = _new(owner)["id"]
     _ok(owner.post(f"/api/prod/orders/{oid}/sample", json={"decision": "approved"}))

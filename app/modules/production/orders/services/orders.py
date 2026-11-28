@@ -1006,6 +1006,81 @@ def record_cut(db: Session, order_id: int, data: dict, actor: UserAccount) -> Pr
     return order
 
 
+def edit_cut(db: Session, order_id: int, data: dict, actor: UserAccount) -> ProdOrder:
+    """**The owner** corrects the cut counts once cutting is recorded, without
+    reopening it or anything after it, with a reason kept in the history.
+    The same checks as recording the cut hold: a shortfall against the plan
+    needs reasons adding up to it, and no size may fall below what has been
+    inspected. Once the final inspection is complete each size's cut must
+    still equal what was inspected, so the counts there change by reopening
+    the inspection. The cut date, the promised date and the factory's report
+    stay as they were. The factory is paid on pieces cut, so this changes
+    what it is owed when the order is settled."""
+    order = _open(db, order_id)
+    facts = _facts(db, order)
+    if not facts.done("cutting"):
+        raise Refused("Cutting isn't recorded yet. Record the cut quantities first.")
+    why = _text(data.get("reason"), limit=500, what="the reason for the change", required=True)
+    cut = _size_map(data.get("sizes"))
+    if sum(cut.values()) <= 0:
+        raise Refused("Give the number cut for at least one size.")
+    inspection_done = facts.done("final_inspection")
+    for size in SIZES:
+        row = facts.sizes.get(size)
+        inspected = ((row.passed or 0) + (row.to_fix or 0) + (row.rejected or 0)) if row is not None else 0
+        wanted = cut.get(size, 0)
+        if inspected > wanted:
+            raise Refused(f"Size {size}: {inspected:,} pieces are already inspected, more than {wanted:,} cut.")
+        if inspection_done and wanted != inspected:
+            raise Refused(
+                f"Size {size}: the final inspection is complete with {inspected:,} inspected. "
+                "Reopen the final inspection to change the cut."
+            )
+
+    before = {size: (row.cut or 0) for size, row in facts.sizes.items()}
+    changes = [
+        f"{size} {before.get(size, 0):,} → {cut.get(size, 0):,}"
+        for size in SIZES
+        if before.get(size, 0) != cut.get(size, 0)
+    ]
+
+    planned_total = facts.total("planned")
+    cut_total = sum(cut.values())
+    shortfall = planned_total - cut_total
+    reasons = _reasons_total(data.get("reasons") or [], "cut_short", "cutting fewer")
+    if shortfall > 0:
+        given = sum(q for _, q in reasons)
+        if given != shortfall:
+            raise Refused(
+                f"{_plural(shortfall, 'piece')} fewer were cut than planned; "
+                f"the reasons account for {given:,}. Make them add up to {shortfall:,}."
+            )
+    else:
+        reasons = []
+    old_reasons = sorted((r.reason, r.quantity) for r in facts.reasons if r.kind == "cut_short")
+    if not changes and sorted(reasons) == old_reasons:
+        raise Refused("Nothing changed. Change a count or a reason, then save.")
+    _replace_reasons(db, facts, "cut_short", reasons, actor)
+
+    for size in SIZES:
+        row = facts.sizes.get(size)
+        if size in cut:
+            if row is None:
+                row = ProdOrderSize(order_id=order.id, size=size, planned=0)
+                db.add(row)
+            row.cut = cut[size]
+        elif row is not None:
+            row.cut = 0
+    _touch(order)
+    _audit(
+        db, order, actor, "cut_edited",
+        f"Changed the cut on {order.code} to {_plural(cut_total, 'piece')}"
+        + (f" ({', '.join(changes)})" if changes else ", reasons only")
+        + f": {why}",
+    )
+    return order
+
+
 # ── The factory's cut report (batch 6b) ──────────────────────────────────────
 
 

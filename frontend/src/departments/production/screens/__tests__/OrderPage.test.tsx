@@ -144,6 +144,70 @@ describe("Cutting", () => {
   });
 });
 
+describe("The owner edits the cut counts", () => {
+  it("is offered only to the owner once cutting is done", async () => {
+    serve(makeOrder("making"));
+    renderAt(ADDRESS, qc());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    expect(screen.queryByRole("button", { name: "Edit cut counts" })).toBeNull();
+    cleanup();
+
+    serve(makeOrder("cutting"));
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    expect(screen.queryByRole("button", { name: "Edit cut counts" })).toBeNull();
+  });
+
+  it("asks why, wants the shortfall explained, and sends a correction", async () => {
+    const calls = serve(makeOrder("making"), {
+      "PATCH /api/prod/orders/3/cut": () => ({ order: makeOrder("making") }),
+    });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit cut counts" }));
+    const form = screen.getByRole("heading", { name: "Edit cut counts", level: 2 }).closest("section")!;
+    const cut = within(within(form).getByRole("group", { name: "Pieces cut" }));
+    expect((cut.getByLabelText("M") as HTMLInputElement).value).toBe("20");
+
+    fireEvent.change(cut.getByLabelText("M"), { target: { value: "18" } });
+    type("Reason 1", "Fabric defects");
+    type("Pieces for reason 1", "2");
+    fireEvent.click(screen.getByRole("button", { name: "Save cut counts" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Say why the cut is changing.");
+    expect(writes(calls)).toHaveLength(0);
+
+    type("Why the cut is changing", "Recounted the M");
+    fireEvent.click(screen.getByRole("button", { name: "Save cut counts" }));
+    await waitFor(() => expect(writes(calls)).toHaveLength(1));
+    const sent = writes(calls)[0];
+    expect(sent.method).toBe("PATCH");
+    expect(sent.path).toBe("/api/prod/orders/3/cut");
+    expect(sent.body).toMatchObject({
+      sizes: { S: 10, M: 18 },
+      reasons: [{ reason: "Fabric defects", quantity: 2 }],
+      reason: "Recounted the M",
+    });
+    expect(await screen.findByText("Cut counts changed.")).toBeTruthy();
+  });
+
+  it("won't go below what is already inspected", async () => {
+    const calls = serve(makeOrder("final_inspection", { sizes: [{ cut: 10, passed: 9, to_fix: 0, rejected: 0 }, { cut: 20 }] }));
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit cut counts" }));
+    const form = screen.getByRole("heading", { name: "Edit cut counts", level: 2 }).closest("section")!;
+    const cut = within(within(form).getByRole("group", { name: "Pieces cut" }));
+    fireEvent.change(cut.getByLabelText("S"), { target: { value: "8" } });
+    type("Reason 1", "Lost");
+    type("Pieces for reason 1", "2");
+    type("Why the cut is changing", "Recount");
+    fireEvent.click(screen.getByRole("button", { name: "Save cut counts" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Size S: 9 pieces are already inspected, more than 8 cut.");
+    expect(writes(calls)).toHaveLength(0);
+  });
+});
+
 describe("Final inspection", () => {
   const sizes = [{ cut: 10 }, { cut: 20 }];
 
